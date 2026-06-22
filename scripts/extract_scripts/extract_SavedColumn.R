@@ -14,23 +14,11 @@ library(writexl)
 
 catalog_file <- file.choose()
 
-raw_data <- readBin(
-  catalog_file,
-  what = "raw",
-  n = file.info(catalog_file)$size
-)
+source("scripts/utils/read_catalog_file.R")
 
-decompressed <- memDecompress(raw_data, type = "unknown")
-decompressed_no_null <- decompressed[decompressed != as.raw(0)]
+catalog_file <- file.choose()
 
-all_text_raw <- rawToChar(decompressed_no_null, multiple = FALSE)
-
-clean_text <- iconv(
-  all_text_raw,
-  from = "UTF-8",
-  to = "UTF-8",
-  sub = ""
-)
+clean_text <- read_catalog_file(catalog_file)
 
 if (is.na(clean_text)) {
   clean_text <- iconv(

@@ -13,14 +13,7 @@ pick_catalog_file <- function() {
   path
 }
 
-decompress_catalog_raw <- function(input_path) {
-  raw_data <- readBin(input_path, what = "raw", n = file.info(input_path)$size)
 
-  tryCatch(
-    memDecompress(raw_data, type = "unknown"),
-    error = function(e) memDecompress(raw_data, type = "gzip")
-  )
-}
 
 find_first_byte <- function(x, value_raw) {
   pos <- which(x == value_raw)
@@ -69,35 +62,12 @@ extract_first_xml_doc <- function(xml_text, root_name) {
   regmatches(xml_text, m)[[1]]
 }
 
-decompress_catalog <- function(input_path, output_path = NULL) {
-  if (!file.exists(input_path)) {
-    stop("File does not exist: ", input_path)
-  }
+source("scripts/utils/read_catalog_file.R")
 
-  raw_data <- decompress_catalog_raw(input_path)
+catalog_file <- file.choose()
 
-  start_pos <- find_first_byte(raw_data, as.raw(0x3c))  # "<"
-  cat("XML starts at byte:", start_pos, "\n")
+clean_text <- read_catalog_file(catalog_file)
 
-  region <- raw_data[start_pos:length(raw_data)]
-  xml_text <- decode_region_from_file(region)
-
-  m <- regexec("<([[:alnum:]_.:-]+)(\\s|>)", xml_text, perl = TRUE)
-  mm <- regmatches(xml_text, m)[[1]]
-  if (length(mm) < 2) stop("Could not find a root opening tag.")
-
-  root_name <- mm[2]
-  cat("Root element appears to be:", root_name, "\n")
-
-  xml_clean <- extract_first_xml_doc(xml_text, root_name)
-
-  if (!is.null(output_path) && nzchar(output_path)) {
-    writeLines(xml_clean, output_path, useBytes = TRUE)
-    cat("Saved clean XML to:", output_path, "\n")
-  }
-
-  read_xml(xml_clean)
-}
 
 extract_report_summary <- function(doc) {
   ns <- xml_ns(doc)
