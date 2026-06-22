@@ -13,3 +13,12 @@ This project parses Alma Analytics `.catalog` files to extract and document OBIE
 x <- 1:10
 mean(x)
 ```
+```{r}
+source("scripts/parse_catalog.R")
+
+results <- parse_catalog(
+  "data/sample.catalog"
+)
+
+head(results)
+```
