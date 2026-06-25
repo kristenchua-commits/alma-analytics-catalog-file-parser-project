@@ -6,14 +6,19 @@ library(stringr)
 library(xml2)
 library(tibble)
 library(readr)
+#list.files()
 
-source("scripts/utils/read_catalog_file.R")
+setwd("/Users/kchua/GitHub/alma-analytics-dot-catalog-parser")
+source("scripts/script_helper_functions/read_catalog_file.R")
 
-# Pick .catalog file
-catalog_file <- file.choose()
-
-# Read and clean .catalog file
-clean_text <- read_catalog_file(catalog_file)
+#### Uncomment to specify the name of the catalog file .catalog file
+CampusLibraryCategorization_catalog_file <- "Physical Preparation Review - Campus Library Categorization Reports.catalog"
+#Filters_catalog_file <- "FiltersAnnualStatistics2025-26.catalog"
+#CheckOutTypeandUserGroup_catalog_file <- "Fulfillment Preparation Review Report - Check Out Type and User Group - Campus Categorization Reports.catalog"
+#EResourceLibraryCategorization_catalog_file <- "Electronic preparation review reports - Campus EResource Library Categorization Reports.catalog"
+#PhysicalCampusLibraryCategorization_catalog_file <- "Physical Preparation Review - Campus Library Categorization Reports.catalog
+# Read and clean selected .catalog file
+clean_text <- read_catalog_file(campus_library_categorization_catalog_file)
 
 # Extract XML blocks from the catalog text
 xml_blocks <- str_extract_all(

@@ -3,7 +3,11 @@
 # One row per saved column
 # =========================================================
 
-setwd("~/Downloads")
+#Open the alma-analytics-dog-catalog-parser 
+#RStudio will automatically set the working directory to the project root. 
+
+
+setwd("/Users/kchua/GitHub/alma-analytics-dot-catalog-parser")
 
 library(stringr)
 library(xml2)
@@ -12,11 +16,11 @@ library(tibble)
 library(readr)
 library(writexl)
 
+
+#choose file from data > catalog file folder
 catalog_file <- file.choose()
 
-source("scripts/utils/read_catalog_file.R")
-
-catalog_file <- file.choose()
+source("scripts/extract_scripts/extract_SavedColumn.R")
 
 clean_text <- read_catalog_file(catalog_file)
 
