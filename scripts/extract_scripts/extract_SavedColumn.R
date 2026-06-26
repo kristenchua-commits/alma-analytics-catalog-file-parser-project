@@ -6,8 +6,8 @@
 #Open the alma-analytics-dog-catalog-parser 
 #RStudio will automatically set the working directory to the project root. 
 
-
-setwd("/Users/kchua/GitHub/alma-analytics-dot-catalog-parser")
+getwd()
+setwd("/Users/kchua/GitHub/alma-analytics-catalog-file-analysis")
 
 library(stringr)
 library(xml2)

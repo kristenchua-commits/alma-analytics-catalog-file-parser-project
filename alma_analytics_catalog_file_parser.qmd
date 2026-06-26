@@ -2,6 +2,8 @@
 
 This project parses Alma Analytics `.catalog` files and extracts metadata from OBIEE reports.
 
+For a Quarto notebook, the goal is to make the notebook self-contained and reproducible. You should replace anything that depends on file.choose() with a path that's determined automatically.
+
 The workflow is:
 
 1.  Select a catalog file from `data/Catalog files/`.
@@ -50,7 +52,7 @@ catalog_file
 ## Read catalog
 
 ```{r}
-catalog <- read_catalog_file(catalog_file)
+catalog_file <- "data/Catalog files/Campus Categorization Reports.catalog"
 ```
 
 ## Select an analysis
