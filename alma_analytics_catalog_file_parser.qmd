@@ -2,85 +2,68 @@
 
 This project parses Alma Analytics `.catalog` files and extracts metadata from OBIEE reports.
 
-For a Quarto notebook, the goal is to make the notebook self-contained and reproducible. You should replace anything that depends on file.choose() with a path that's determined automatically.
+This notebook is designed to be self-contained and reproducible. It does not use interactive prompts such as `file.choose()` or `menu()`. Instead, it uses project-relative paths so the notebook can be rendered consistently by anyone who clones the repository.
 
 The workflow is:
 
-1.  Select a catalog file from `data/Catalog files/`.
-2.  Source the helper functions.
-3.  Select an analysis script from `scripts/extract_scripts/`.
-4.  Run the analysis.
-5.  Export the results to `data/processed/`.
+1. Load the helper functions.
+2. Read the Alma Analytics catalog file.
+3. Locate the analysis script.
+4. Run the analysis.
+5. Preview the results.
+6. Export the results.
 
-## Load helper functions
+## Load packages and helper functions
 
 ```{r}
-helper_scripts <- list.files(
-  "scripts/script_helper_functions",
-  pattern = "\\.[Rr]$",
-  full.names = TRUE
-)
+library(here)
 
-invisible(lapply(helper_scripts, source))
-
-## Select a catalog file
-
-catalog_files <- list.files(
-  "data/Catalog files",
-  pattern = "\\.catalog$",
-  full.names = TRUE,
-  recursive = TRUE
-)
-
-if (length(catalog_files) == 0) {
-  stop("No .catalog files found in data/Catalog files/")
-}
-
-selection <- menu(
-  basename(catalog_files),
-  title = "Choose a catalog file"
-)
-
-if (selection == 0) {
-  stop("No catalog file selected.")
-}
-
-catalog_file <- catalog_files[selection]
-catalog_file
+source(here(
+  "scripts",
+  "script_helper_functions",
+  "read_catalog_file.R"
+))
 ```
 
 ## Read catalog
 
 ```{r}
-catalog_file <- "data/Catalog files/Campus Categorization Reports.catalog"
+catalog_file <- here(
+  "data",
+  "Catalog files",
+  "FiltersAnnualStatistics2025-26.catalog"
+)
+
+if (!file.exists(catalog_file)) {
+  stop("Catalog file not found: ", catalog_file)
+}
+
+catalog <- read_catalog_file(catalog_file)
 ```
 
-## Select an analysis
-
-This `.qmd` file should never ask the user what to do, so for the purposes of this .qmd notebook
+## Select analysis script
 
 ```{r}
-# analysis_scripts <- list.files(
-#   "scripts/extract_scripts",
-#   pattern = "\\.[Rr]$",
-#   full.names = TRUE
-# )
-# 
-# if (length(analysis_scripts) == 0) {
-#   stop("No analysis scripts found in scripts/extract_scripts/")
-# }
-# 
-# selection <- menu(
-#   basename(analysis_scripts),
-#   title = "Choose an analysis"
-# )
-# 
-# if (selection == 0) {
-#   stop("No analysis selected.")
-# }
-# 
-# analysis_script <- analysis_scripts[selection]
-# analysis_script
+analysis_scripts <- list.files(
+  here("scripts", "extract_scripts"),
+  pattern = "\\.[Rr]$",
+  full.names = TRUE
+)
+
+if (length(analysis_scripts) == 0) {
+  stop("No analysis scripts found in scripts/extract_scripts/")
+}
+
+if (length(analysis_scripts) > 1) {
+  stop(
+    "Multiple analysis scripts found. ",
+    "Specify which one to use or keep only one script in scripts/extract_scripts/."
+  )
+}
+
+analysis_script <- analysis_scripts[1]
+
+cat("Running:", basename(analysis_script), "\n")
 ```
 
 ## Run analysis
@@ -89,7 +72,7 @@ This `.qmd` file should never ask the user what to do, so for the purposes of 
 source(analysis_script)
 ```
 
-The selected script should create an object called `results`.
+The analysis script should create an object named `results`.
 
 ## Preview results
 
@@ -97,31 +80,31 @@ The selected script should create an object called `results`.
 if (exists("results")) {
   head(results)
 } else {
-  cat("No object named 'results' was created by the analysis script.\n")
+  stop("The analysis script did not create an object named 'results'.")
 }
 ```
 
 ## Export results
 
 ```{r}
-if (exists("results")) {
-  dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
+dir.create(
+  here("data", "processed"),
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
-  output_file <- file.path(
-    "data/processed",
-    paste0(
-      tools::file_path_sans_ext(basename(catalog_file)),
-      "_",
-      tools::file_path_sans_ext(basename(analysis_script)),
-      ".csv"
-    )
+output_file <- here(
+  "data",
+  "processed",
+  paste0(
+    tools::file_path_sans_ext(basename(catalog_file)),
+    "_",
+    tools::file_path_sans_ext(basename(analysis_script)),
+    ".csv"
   )
+)
 
-  write.csv(results, output_file, row.names = FALSE)
+write.csv(results, output_file, row.names = FALSE)
 
-  cat("Results written to:\n", output_file, "\n")
-}
-```
-
-```         
+cat("Results written to:\n", output_file, "\n")
 ```
