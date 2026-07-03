@@ -16,6 +16,12 @@ pick_catalog_file <- function() {
   path
 }
 
+unwrap_xml_doc <- function(x) {
+  if (inherits(x, "xml_document")) return(x)
+  if (is.list(x) && length(x) == 1 && inherits(x[[1]], "xml_document")) return(x[[1]])
+  x
+}
+
 default_if_missing <- function(x, default) {
   if (is.null(x) || length(x) == 0 || all(is.na(x)) || !nzchar(x[1])) {
     default
@@ -34,6 +40,7 @@ extract_expr_tree <- function(node) {
   
   label <- if (length(expr_children) == 0) {
     txt <- trimws(xml_text(node))
+    
     if (node_type == "xsd:string") {
       paste0("string: ", shQuote(txt))
     } else if (node_type == "xsd:date") {
@@ -75,12 +82,6 @@ extract_report_summary <- function(doc) {
   )
 }
 
-unwrap_xml_doc <- function(x) {
-  if (inherits(x, "xml_document")) return(x)
-  if (is.list(x) && length(x) == 1 && inherits(x[[1]], "xml_document")) return(x[[1]])
-  x
-}
-
 print_expr_tree <- function(tree, indent = "") {
   if (is.null(tree)) return(invisible(NULL))
   
@@ -93,6 +94,12 @@ print_expr_tree <- function(tree, indent = "") {
   }
   
   invisible(NULL)
+}
+
+xml_doc_to_text <- function(doc) {
+  doc <- unwrap_xml_doc(doc)
+  if (is.null(doc) || (is.atomic(doc) && all(is.na(doc)))) return(NA_character_)
+  paste0(as.character(doc), collapse = "")
 }
 
 # -------------------------
@@ -115,7 +122,7 @@ if (nrow(catalog_xml) == 0) {
 
 if (nrow(catalog_meta) != nrow(catalog_xml)) {
   warning(
-    "Metadata rows (", nrow(catalog_meta), 
+    "Metadata rows (", nrow(catalog_meta),
     ") do not match XML rows (", nrow(catalog_xml), "). Joining by catalog_index."
   )
 }
@@ -128,25 +135,21 @@ catalog_all <- merge(
   suffixes = c("_meta", "_xml")
 )
 
-# Keep the useful name fields from metadata
+# Preserve a readable label for each saved filter
 catalog_all$item_label <- ifelse(
   !is.na(catalog_all$item_name) & nzchar(catalog_all$item_name),
   catalog_all$item_name,
   paste0("Block ", catalog_all$catalog_index)
 )
 
-# Parse XML trees for each block
-catalog_all$xml_text <- vapply(catalog_all$xml, function(doc) {
-  if (is.null(doc)) return(NA_character_)
-  doc <- unwrap_xml_doc(doc)
-  as.character(doc)
-}, character(1))
+# Convert XML docs to plain text so they survive saveRDS()
+catalog_all$xml_text <- vapply(catalog_all$xml, xml_doc_to_text, character(1))
 
+# Optional parsed tree for console inspection / debugging
 catalog_all$filter_tree <- lapply(catalog_all$xml_text, function(xml_txt) {
   if (is.na(xml_txt) || !nzchar(xml_txt)) return(NULL)
   doc <- xml2::read_xml(xml_txt)
-  summary <- extract_report_summary(doc)
-  summary$filter_tree
+  extract_report_summary(doc)$filter_tree
 })
 
 # Optional console summary
@@ -164,18 +167,47 @@ for (i in seq_len(nrow(catalog_all))) {
   cat("\n")
 }
 
-# Save a clean extract for later use
+# Save a clean extract for rendering
 output_dir <- "output"
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+str(catalog_all)
+catalog_out <- catalog_all[, c(
+  "catalog_index",
+  "source_file_name_meta",
+  "item_name",
+  "item_label",
+  "subject_area",
+  "original_path",
+  "object_signature",
+  "owner_id",
+  "creator_id",
+  "item_type",
+  "created_year",
+  "created_month",
+  "created_day",
+  "created_hour",
+  "created_minute",
+  "created_second",
+  "wc_build",
+  "wc_desc",
+  "source_file_name_xml",
+  "root_name",
+  "xml_text"
+)]
+
+names(catalog_out)[names(catalog_out) == "source_file_name_meta"] <- "source_file_name"
+catalog_out$source_file_name_xml <- NULL
 
 saveRDS(
-  catalog_all,
+  catalog_out,
   file = file.path(output_dir, "catalog_extract.rds")
 )
 
 write.csv(
-  catalog_all[, c(
+  catalog_out[, c(
     "catalog_index",
+    "source_file_name",
+    "item_name",
     "item_label",
     "subject_area",
     "original_path",

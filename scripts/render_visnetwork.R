@@ -1,7 +1,7 @@
+library(shiny)
 library(visNetwork)
-library(htmlwidgets)
+library(xml2)
 
-# If you saved the extract as an RDS, this script stays purely in rendering mode.
 extract_path <- "output/catalog_extract.rds"
 
 if (!file.exists(extract_path)) {
@@ -10,9 +10,10 @@ if (!file.exists(extract_path)) {
 
 catalog_all <- readRDS(extract_path)
 
-# -----------------------------
-# Helpers
-# -----------------------------
+if (!"xml_text" %in% names(catalog_all)) {
+  stop("catalog_extract.rds must contain xml_text. Re-run extract_XMLFileList.r.")
+}
+
 default_if_missing <- function(x, default) {
   if (is.null(x) || length(x) == 0 || all(is.na(x)) || !nzchar(x[1])) {
     default
@@ -21,20 +22,38 @@ default_if_missing <- function(x, default) {
   }
 }
 
-unwrap_xml_doc <- function(x) {
-  if (inherits(x, "xml_document")) return(x)
-  if (is.list(x) && length(x) == 1 && inherits(x[[1]], "xml_document")) return(x[[1]])
-  x
+extract_campus <- function(item_name) {
+  if (is.na(item_name) || !nzchar(item_name)) return("Unknown")
+  
+  campuses <- c("UCB", "UCD", "UCI", "UCLA", "UCM", "UCR", "UCSB", "UCSC", "UCSD", "UCSF")
+  for (campus in campuses) {
+    if (grepl(campus, item_name, fixed = TRUE)) return(campus)
+  }
+  
+  if (grepl("GLOBAL", item_name, ignore.case = TRUE)) return("Global")
+  if (grepl("FULFILLMENT", item_name, ignore.case = TRUE)) return("Fulfillment")
+  if (grepl("PHYSICAL", item_name, ignore.case = TRUE)) return("Physical")
+  
+  "Unknown"
 }
 
-sanitize_id <- function(x) {
-  x <- as.character(x)
-  x <- gsub("[^A-Za-z0-9_]+", "_", x)
-  x <- gsub("_+", "_", x)
-  x <- gsub("^_|_$", "", x)
-  if (!nzchar(x)) x <- "node"
-  x
+catalog_all$campus <- if ("campus" %in% names(catalog_all)) {
+  ifelse(is.na(catalog_all$campus) | !nzchar(catalog_all$campus), "Unknown", catalog_all$campus)
+} else {
+  vapply(catalog_all$item_label, extract_campus, character(1))
 }
+
+catalog_all$subject_area <- ifelse(
+  is.na(catalog_all$subject_area) | !nzchar(catalog_all$subject_area),
+  "Unknown subject area",
+  catalog_all$subject_area
+)
+
+catalog_all$item_label <- ifelse(
+  is.na(catalog_all$item_label) | !nzchar(catalog_all$item_label),
+  paste0("Block ", catalog_all$catalog_index),
+  catalog_all$item_label
+)
 
 extract_expr_tree <- function(node) {
   if (is.na(node) || length(node) == 0) return(NULL)
@@ -72,7 +91,42 @@ extract_expr_tree <- function(node) {
   )
 }
 
-tree_to_visnetwork <- function(catalog_all) {
+extract_container_tree <- function(container_node, container_name) {
+  if (is.na(container_node) || length(container_node) == 0) return(NULL)
+  
+  expr_children <- xml2::xml_children(container_node)
+  expr_children <- expr_children[xml2::xml_name(expr_children) == "expr"]
+  
+  list(
+    label = container_name,
+    children = lapply(expr_children, extract_expr_tree)
+  )
+}
+
+extract_report_tree <- function(xml_txt) {
+  if (is.na(xml_txt) || !nzchar(xml_txt)) return(NULL)
+  
+  doc <- xml2::read_xml(xml_txt)
+  root <- xml2::xml_root(doc)
+  
+  containers <- xml2::xml_children(root)
+  containers <- containers[xml2::xml_name(containers) %in% c("filter", "criteria")]
+  
+  if (!length(containers)) return(NULL)
+  
+  children <- list()
+  for (cnode in containers) {
+    cname <- xml2::xml_name(cnode)
+    children[[length(children) + 1]] <- extract_container_tree(cnode, cname)
+  }
+  
+  list(
+    label = default_if_missing(xml2::xml_attr(root, "subjectArea"), "report"),
+    children = children
+  )
+}
+
+tree_to_visnetwork <- function(tree, item_label, subject_area, original_path) {
   nodes <- data.frame(
     id = character(0),
     label = character(0),
@@ -103,30 +157,21 @@ tree_to_visnetwork <- function(catalog_all) {
   add_edge <- function(from, to) {
     edges <<- rbind(
       edges,
-      data.frame(
-        from = from,
-        to = to,
-        stringsAsFactors = FALSE
-      )
+      data.frame(from = from, to = to, stringsAsFactors = FALSE)
     )
   }
   
-  walk_tree <- function(tree, parent_id, prefix, counter_env) {
-    if (is.null(tree)) return(invisible(NULL))
+  walk_tree <- function(node, parent_id, prefix, counter_env) {
+    if (is.null(node)) return(invisible(NULL))
     
     counter_env$counter <- counter_env$counter + 1L
     my_id <- paste0(prefix, "_", counter_env$counter)
     
-    add_node(
-      id = my_id,
-      label = tree$label,
-      group = "expr",
-      title = tree$label
-    )
+    add_node(my_id, node$label, "expr", node$label)
     add_edge(parent_id, my_id)
     
-    if (length(tree$children)) {
-      for (child in tree$children) {
+    if (length(node$children)) {
+      for (child in node$children) {
         walk_tree(child, my_id, prefix, counter_env)
       }
     }
@@ -134,145 +179,137 @@ tree_to_visnetwork <- function(catalog_all) {
     invisible(my_id)
   }
   
-  # Root node
-  source_file <- attr(catalog_all, "source_file_name")
-  if (is.null(source_file) || !nzchar(source_file)) {
-    source_file <- "catalog file"
-  }
-  
   add_node(
-    id = "catalog_root",
-    label = source_file,
-    group = "root",
-    title = source_file
+    id = "root",
+    label = item_label,
+    group = "item",
+    title = paste0(
+      "Item: ", item_label, "\n",
+      "Subject area: ", subject_area, "\n",
+      "Path: ", original_path
+    )
   )
   
-  # Group by subject area, then item label, then expression tree
-  subject_areas <- unique(catalog_all$subject_area)
-  subject_areas <- subject_areas[!is.na(subject_areas) & nzchar(subject_areas)]
-  
-  subject_ids <- setNames(character(0), character(0))
-  
-  for (sa in subject_areas) {
-    sa_id <- paste0("subject_", sanitize_id(sa))
-    subject_ids[[sa]] <- sa_id
-    
-    add_node(
-      id = sa_id,
-      label = sa,
-      group = "subject",
-      title = sa
-    )
-    add_edge("catalog_root", sa_id)
-  }
-  
-  # Some rows may have NA subject_area
-  if (any(is.na(catalog_all$subject_area) | !nzchar(catalog_all$subject_area))) {
-    sa_id <- "subject_Unknown"
-    add_node(
-      id = sa_id,
-      label = "Unknown subject area",
-      group = "subject",
-      title = "Unknown subject area"
-    )
-    add_edge("catalog_root", sa_id)
-  }
-  
-  for (i in seq_len(nrow(catalog_all))) {
-    row <- catalog_all[i, ]
-    
-    subject_area <- row$subject_area
-    if (is.na(subject_area) || !nzchar(subject_area)) {
-      subject_area <- "Unknown subject area"
-      sa_id <- "subject_Unknown"
-    } else {
-      sa_id <- subject_ids[[subject_area]]
-      if (is.null(sa_id) || !nzchar(sa_id)) {
-        sa_id <- paste0("subject_", sanitize_id(subject_area))
-      }
-    }
-    
-    item_label <- row$item_label
-    if (is.na(item_label) || !nzchar(item_label)) {
-      item_label <- paste0("Block ", row$catalog_index)
-    }
-    
-    item_id <- paste0("item_", row$catalog_index)
-    add_node(
-      id = item_id,
-      label = item_label,
-      group = "item",
-      title = paste0(
-        "Item: ", item_label, "\n",
-        "Subject area: ", subject_area, "\n",
-        "Path: ", ifelse(is.na(row$original_path), "", row$original_path)
-      )
-    )
-    add_edge(sa_id, item_id)
-    
-    # Expand the filter tree under each item
-    xml_txt <- as.character(catalog_all$xml_text[i])
-    
-    if (length(xml_txt) == 1L && !is.na(xml_txt) && nzchar(xml_txt)) {
-      doc <- xml2::read_xml(xml_txt)
-      filter_node <- xml2::xml_find_first(doc, ".//*[local-name()='filter']")
-      expr_node <- if (!is.na(filter_node)) {
-        xml2::xml_find_first(filter_node, ".//*[local-name()='expr']")
-      } else {
-        NA
-      }
-      
-      if (!is.na(expr_node)) {
-        tree <- extract_expr_tree(expr_node)
-        counter_env <- new.env(parent = emptyenv())
-        counter_env$counter <- 0L
-        walk_tree(tree, item_id, prefix = paste0("item_", row$catalog_index), counter_env)
-      }
-    }
+  if (!is.null(tree) && length(tree$children)) {
+    counter_env <- new.env(parent = emptyenv())
+    counter_env$counter <- 0L
+    walk_tree(tree, "root", prefix = gsub("[^A-Za-z0-9_]+", "_", item_label), counter_env = counter_env)
   }
   
   list(nodes = nodes, edges = edges)
 }
 
-# -----------------------------
-# Build and render
-# -----------------------------
-graph <- tree_to_visnetwork(catalog_all)
-
-visNetwork(graph$nodes, graph$edges, width = "100%", height = "900px") |>
-  visNodes(
-    shape = "box",
-    font = list(size = 13),
-    margin = 10
-  ) |>
-  visEdges(
-    arrows = list(to = list(enabled = TRUE, scaleFactor = 0.7))
-  ) |>
-  visGroups(
-    groupname = "root",
-    color = list(background = "#ffe6cc", border = "#d79b00")
-  ) |>
-  visGroups(
-    groupname = "subject",
-    color = list(background = "#d5e8d4", border = "#82b366")
-  ) |>
-  visGroups(
-    groupname = "item",
-    color = list(background = "#dae8fc", border = "#6c8ebf")
-  ) |>
-  visGroups(
-    groupname = "expr",
-    color = list(background = "#fff2cc", border = "#d6b656")
-  ) |>
-  visOptions(
-    highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
-    nodesIdSelection = TRUE
-  ) |>
-  visPhysics(stabilization = TRUE) |>
-  visHierarchicalLayout(
-    enabled = TRUE,
-    direction = "UD",
-    sortMethod = "directed",
-    levelSeparation = 130,
-    nodeSpacing = 160
+ui <- fluidPage(
+  titlePanel("Alma Catalog Explorer"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("campus", "Campus", choices = c("All", sort(unique(catalog_all$campus)))),
+      selectInput("subject_area", "Subject area", choices = c("All")),
+      selectInput("item_label", "Filter item", choices = c("All"))
+    ),
+    mainPanel(
+      visNetworkOutput("graph", height = "900px")
+    )
   )
+)
+
+server <- function(input, output, session) {
+  
+  observeEvent(input$campus, {
+    dat <- catalog_all
+    if (input$campus != "All") {
+      dat <- dat[dat$campus == input$campus, , drop = FALSE]
+    }
+    subjects <- c("All", sort(unique(dat$subject_area)))
+    updateSelectInput(session, "subject_area", choices = subjects, selected = "All")
+  }, ignoreInit = FALSE)
+  
+  observeEvent(list(input$campus, input$subject_area), {
+    dat <- catalog_all
+    if (input$campus != "All") {
+      dat <- dat[dat$campus == input$campus, , drop = FALSE]
+    }
+    if (input$subject_area != "All") {
+      dat <- dat[dat$subject_area == input$subject_area, , drop = FALSE]
+    }
+    items <- c("All", sort(unique(dat$item_label)))
+    updateSelectInput(session, "item_label", choices = items, selected = "All")
+  }, ignoreInit = FALSE)
+  
+  output$graph <- renderVisNetwork({
+    dat <- catalog_all
+    
+    if (input$campus != "All") {
+      dat <- dat[dat$campus == input$campus, , drop = FALSE]
+    }
+    if (input$subject_area != "All") {
+      dat <- dat[dat$subject_area == input$subject_area, , drop = FALSE]
+    }
+    if (input$item_label != "All") {
+      dat <- dat[dat$item_label == input$item_label, , drop = FALSE]
+    }
+    
+    if (nrow(dat) == 0) {
+      return(
+        visNetwork(
+          data.frame(id = "empty", label = "No matching filters", group = "item"),
+          data.frame(from = character(0), to = character(0))
+        ) |>
+          visNodes(shape = "box")
+      )
+    }
+    
+    row <- dat[1, , drop = FALSE]
+    tree <- extract_report_tree(as.character(row$xml_text))
+    graph <- tree_to_visnetwork(
+      tree = tree,
+      item_label = row$item_label,
+      subject_area = row$subject_area,
+      original_path = row$original_path
+    )
+    
+    visNetwork(graph$nodes, graph$edges, width = "100%", height = "900px") |>
+      visNodes(shape = "box", font = list(size = 13), margin = 14) |>
+      visEdges(
+        arrows = list(to = list(enabled = TRUE, scaleFactor = 0.7)),
+        smooth = FALSE
+      ) |>
+      visGroups(
+        groupname = "item",
+        color = list(background = "#dae8fc", border = "#6c8ebf")
+      ) |>
+      visGroups(
+        groupname = "expr",
+        color = list(background = "#fff2cc", border = "#d6b656")
+      ) |>
+      visOptions(
+        highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
+        nodesIdSelection = TRUE
+      ) |>
+      visHierarchicalLayout(
+        enabled = TRUE,
+        direction = "UD",
+        sortMethod = "directed",
+        levelSeparation = 220,
+        nodeSpacing = 300,
+        treeSpacing = 340,
+        blockShifting = TRUE,
+        edgeMinimization = TRUE,
+        parentCentralization = TRUE
+      ) |>
+      visPhysics(
+        enabled = TRUE,
+        solver = "hierarchicalRepulsion",
+        hierarchicalRepulsion = list(
+          nodeDistance = 220,
+          springLength = 220,
+          centralGravity = 0.0,
+          damping = 0.12,
+          avoidOverlap = 1
+        ),
+        stabilization = list(enabled = TRUE, iterations = 300)
+      )
+  })
+}
+
+shinyApp(ui, server)
