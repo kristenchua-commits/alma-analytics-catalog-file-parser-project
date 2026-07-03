@@ -1,128 +1,190 @@
 library(xml2)
 
+source("scripts/read_catalog_metadata.R")
+source("scripts/script_helper_functions/read_catalog_file.R")
+
 pick_catalog_file <- function() {
   path <- system(
     "osascript -e 'POSIX path of (choose file with prompt \"Choose a .catalog file\")'",
     intern = TRUE
   )
-
+  
   if (length(path) == 0 || !nzchar(path)) {
     stop("No file selected.")
   }
-
+  
   path
 }
 
-
-
-find_first_byte <- function(x, value_raw) {
-  pos <- which(x == value_raw)
-  if (length(pos) == 0) stop("Target byte not found.")
-  pos[1]
+default_if_missing <- function(x, default) {
+  if (is.null(x) || length(x) == 0 || all(is.na(x)) || !nzchar(x[1])) {
+    default
+  } else {
+    x[1]
+  }
 }
 
-decode_region_from_file <- function(region_raw) {
-  tf <- tempfile(fileext = ".bin")
-  on.exit(unlink(tf), add = TRUE)
-  writeBin(region_raw, tf)
-
-  candidate_encodings <- c("UTF-16LE", "UTF-16BE", "UTF-8", "latin1")
-
-  for (enc in candidate_encodings) {
-    txt <- tryCatch(
-      paste(readLines(tf, warn = FALSE, encoding = enc), collapse = "\n"),
-      error = function(e) NULL
-    )
-
-    if (!is.null(txt)) {
-      txt2 <- trimws(txt)
-      if (startsWith(txt2, "<?xml") || startsWith(txt2, "<")) {
-        cat("Decoded using:", enc, "\n")
-        return(txt)
-      }
+extract_expr_tree <- function(node) {
+  if (is.na(node) || length(node) == 0) return(NULL)
+  
+  node_type <- xml_attr(node, "type")
+  op <- xml_attr(node, "op")
+  children <- xml_children(node)
+  expr_children <- children[xml_name(children) == "expr"]
+  
+  label <- if (length(expr_children) == 0) {
+    txt <- trimws(xml_text(node))
+    if (node_type == "xsd:string") {
+      paste0("string: ", shQuote(txt))
+    } else if (node_type == "xsd:date") {
+      paste0("date: ", txt)
+    } else if (nzchar(txt)) {
+      paste0(default_if_missing(node_type, "expr"), ": ", txt)
+    } else {
+      default_if_missing(node_type, "expr")
     }
+  } else if (node_type == "sawx:logical") {
+    paste0("logical (", toupper(default_if_missing(op, "and")), ")")
+  } else if (node_type == "sawx:comparison") {
+    paste0("comparison (", default_if_missing(op, "op"), ")")
+  } else if (node_type == "sawx:list") {
+    paste0("list (", toupper(default_if_missing(op, "in")), ")")
+  } else {
+    default_if_missing(node_type, "expr")
   }
-
-  stop("Could not decode the XML region with the candidate encodings.")
+  
+  list(
+    label = label,
+    children = lapply(expr_children, extract_expr_tree)
+  )
 }
-
-escape_regex <- function(x) {
-  gsub("([][{}()+*^$.|\\\\?])", "\\\\\\1", x, perl = TRUE)
-}
-
-extract_first_xml_doc <- function(xml_text, root_name) {
-  root_esc <- escape_regex(root_name)
-  pat <- paste0("(?s)<\\?xml.*?</", root_esc, "\\s*>")
-  m <- regexpr(pat, xml_text, perl = TRUE)
-
-  if (m[1] == -1) {
-    stop("Could not extract a single XML document for root: ", root_name)
-  }
-
-  regmatches(xml_text, m)[[1]]
-}
-
-source("scripts/utils/read_catalog_file.R")
-
-catalog_file <- file.choose()
-
-clean_text <- read_catalog_file(catalog_file)
-
 
 extract_report_summary <- function(doc) {
-  ns <- xml_ns(doc)
-
-  criteria <- xml_find_first(doc, ".//saw:criteria", ns)
-
-  columns <- xml_find_all(doc, ".//saw:columns//saw:column", ns)
-  filters <- xml_find_all(doc, ".//saw:filter", ns)
-
-  column_summary <- data.frame(
-    index = seq_along(columns),
-    type = xml_attr(columns, "xsi:type"),
-    column_id = xml_attr(columns, "columnID"),
-    path = xml_attr(columns, "path"),
-    stringsAsFactors = FALSE
-  )
-
-  filter_text <- if (length(filters) > 0) {
-    xml_text(filters)
+  root <- xml_root(doc)
+  
+  filter_node <- xml_find_first(doc, ".//*[local-name()='filter']")
+  expr_node <- if (!is.na(filter_node)) {
+    xml_find_first(filter_node, ".//*[local-name()='expr']")
   } else {
-    character(0)
+    NA
   }
-
+  
   list(
-    subject_area = xml_attr(criteria, "subjectArea"),
-    column_summary = column_summary,
-    filter_text = filter_text,
-    namespaces = ns
+    subject_area = xml_attr(root, "subjectArea"),
+    filter_tree = if (!is.na(expr_node)) extract_expr_tree(expr_node) else NULL
   )
 }
 
-# --- main script ---
+unwrap_xml_doc <- function(x) {
+  if (inherits(x, "xml_document")) return(x)
+  if (is.list(x) && length(x) == 1 && inherits(x[[1]], "xml_document")) return(x[[1]])
+  x
+}
+
+print_expr_tree <- function(tree, indent = "") {
+  if (is.null(tree)) return(invisible(NULL))
+  
+  cat(indent, "- ", tree$label, "\n", sep = "")
+  
+  if (length(tree$children)) {
+    for (child in tree$children) {
+      print_expr_tree(child, paste0(indent, "  "))
+    }
+  }
+  
+  invisible(NULL)
+}
+
+# -------------------------
+# Main
+# -------------------------
 
 catalog_path <- pick_catalog_file()
+cat("Selected file:", catalog_path, "\n")
 
-output_path <- sub(
-  "\\.catalog$",
-  ".xml",
-  catalog_path,
-  ignore.case = TRUE
+catalog_meta <- read_catalog_metadata(catalog_path, keep_strings = TRUE)
+catalog_xml  <- read_catalog_file(catalog_path, keep_xml = TRUE, keep_strings = TRUE)
+
+if (nrow(catalog_meta) == 0) {
+  stop("No metadata records were found in the .catalog file.")
+}
+
+if (nrow(catalog_xml) == 0) {
+  stop("No XML documents were found in the .catalog file.")
+}
+
+if (nrow(catalog_meta) != nrow(catalog_xml)) {
+  warning(
+    "Metadata rows (", nrow(catalog_meta), 
+    ") do not match XML rows (", nrow(catalog_xml), "). Joining by catalog_index."
+  )
+}
+
+catalog_all <- merge(
+  catalog_meta,
+  catalog_xml,
+  by = "catalog_index",
+  all = TRUE,
+  suffixes = c("_meta", "_xml")
 )
 
-cat("Will save to:", output_path, "\n")
+# Keep the useful name fields from metadata
+catalog_all$item_label <- ifelse(
+  !is.na(catalog_all$item_name) & nzchar(catalog_all$item_name),
+  catalog_all$item_name,
+  paste0("Block ", catalog_all$catalog_index)
+)
 
-doc <- decompress_catalog(catalog_path, output_path)
+# Parse XML trees for each block
+catalog_all$xml_text <- vapply(catalog_all$xml, function(doc) {
+  if (is.null(doc)) return(NA_character_)
+  doc <- unwrap_xml_doc(doc)
+  as.character(doc)
+}, character(1))
 
-xml_structure(doc)
+catalog_all$filter_tree <- lapply(catalog_all$xml_text, function(xml_txt) {
+  if (is.na(xml_txt) || !nzchar(xml_txt)) return(NULL)
+  doc <- xml2::read_xml(xml_txt)
+  summary <- extract_report_summary(doc)
+  summary$filter_tree
+})
 
-summary <- extract_report_summary(doc)
+# Optional console summary
+cat("\nFound", nrow(catalog_all), "combined block(s)\n\n")
 
-cat("\nSubject area:\n")
-print(summary$subject_area)
+for (i in seq_len(nrow(catalog_all))) {
+  cat("============================\n")
+  cat("Block", catalog_all$catalog_index[i], "\n")
+  cat("Item name:", catalog_all$item_label[i], "\n")
+  cat("Subject area:", catalog_all$subject_area[i], "\n")
+  cat("Original path:", catalog_all$original_path[i], "\n")
+  cat("============================\n\n")
+  
+  print_expr_tree(catalog_all$filter_tree[[i]])
+  cat("\n")
+}
 
-cat("\nColumns:\n")
-print(summary$column_summary)
+# Save a clean extract for later use
+output_dir <- "output"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
-cat("\nFilter text:\n")
-print(summary$filter_text)
+saveRDS(
+  catalog_all,
+  file = file.path(output_dir, "catalog_extract.rds")
+)
+
+write.csv(
+  catalog_all[, c(
+    "catalog_index",
+    "item_label",
+    "subject_area",
+    "original_path",
+    "root_name"
+  )],
+  file = file.path(output_dir, "catalog_extract_summary.csv"),
+  row.names = FALSE
+)
+
+cat("Wrote:\n")
+cat(" - output/catalog_extract.rds\n")
+cat(" - output/catalog_extract_summary.csv\n")
