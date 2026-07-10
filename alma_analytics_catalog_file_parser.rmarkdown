@@ -24,14 +24,14 @@ invisible(lapply(helper_scripts, source))
 ## Select a catalog file
 
 catalog_files <- list.files(
-  "data/Catalog files",
+  "data",
   pattern = "\\.catalog$",
   full.names = TRUE,
   recursive = TRUE
 )
 
 if (length(catalog_files) == 0) {
-  stop("No .catalog files found in data/Catalog files/")
+  stop("No .catalog files found in data")
 }
 
 selection <- menu(

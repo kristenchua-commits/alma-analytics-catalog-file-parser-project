@@ -1,3 +1,5 @@
+### a function, is not calling a specific file yet, will need to activate in another script###
+
 decode_xml_raw <- function(xml_raw) {
   tf <- tempfile(fileext = ".bin")
   on.exit(unlink(tf), add = TRUE)
@@ -22,7 +24,8 @@ decode_xml_raw <- function(xml_raw) {
   stop("Could not decode XML chunk.")
 }
 
-read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRUE) {
+read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRUE,
+                              progress = interactive()) {
   if (!file.exists(catalog_file)) {
     stop("Catalog file not found: ", catalog_file)
   }
@@ -33,16 +36,22 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
     
     if (m == 0 || n < m) return(integer(0))
     
-    hits <- integer(0)
     last <- n - m + 1L
-    
-    for (i in seq.int(start, last)) {
-      if (all(x[i:(i + m - 1L)] == pattern_raw)) {
-        hits <- c(hits, i)
+
+    if (start > last) return(integer(0))
+
+    # Compare each byte of the pattern across the candidate range using
+    # vectorized raw operations. This avoids an R-level loop over every byte.
+    candidates <- seq.int(start, last)
+    matches <- x[candidates] == pattern_raw[1L]
+
+    if (m > 1L) {
+      for (j in 2:m) {
+        matches <- matches & x[candidates + j - 1L] == pattern_raw[j]
       }
     }
-    
-    hits
+
+    candidates[matches]
   }
   
   extract_ascii_strings <- function(raw_vec, min_len = 8L) {
@@ -83,7 +92,10 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
   xml_start_pat <- charToRaw("<?xml")
   meta_start_pat <- charToRaw('{"ACL"')
   
+  # Find each boundary once. The previous implementation searched from every
+  # XML document to the end of the file, causing quadratic runtime.
   starts <- find_raw_pattern(raw_decompressed, xml_start_pat)
+  metadata_starts <- find_raw_pattern(raw_decompressed, meta_start_pat)
   
   if (!length(starts)) {
     stop("No XML found inside catalog file.")
@@ -91,12 +103,26 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
   
   rows <- vector("list", length(starts))
   xml_docs <- vector("list", length(starts))
+
+  if (progress) {
+    message("Found ", length(starts), " XML documents; parsing...")
+    progress_bar <- utils::txtProgressBar(min = 0L, max = length(starts), style = 3L)
+    on.exit(close(progress_bar), add = TRUE)
+  }
   
   for (i in seq_along(starts)) {
     start_pos <- starts[i]
     
     next_xml_start <- if (i < length(starts)) starts[i + 1L] else length(raw_decompressed) + 1L
-    meta_after <- find_raw_pattern(raw_decompressed, meta_start_pat, start = start_pos + length(xml_start_pat))
+    metadata_index <- findInterval(
+      start_pos + length(xml_start_pat) - 1L,
+      metadata_starts
+    ) + 1L
+    meta_after <- if (metadata_index <= length(metadata_starts)) {
+      metadata_starts[metadata_index]
+    } else {
+      integer(0)
+    }
     
     end_pos <- next_xml_start - 1L
     if (length(meta_after)) {
@@ -106,6 +132,16 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
     if (end_pos < start_pos) {
       next
     }
+
+    # Catalog records can include separator/control bytes between the closing
+    # XML tag and their metadata. Exclude those bytes from the XML parser.
+    closing_brackets <- which(
+      raw_decompressed[start_pos:end_pos] == charToRaw(">")
+    )
+    if (!length(closing_brackets)) {
+      stop("XML document ", i, " has no closing tag.")
+    }
+    end_pos <- start_pos + closing_brackets[length(closing_brackets)] - 1L
     
     xml_raw <- raw_decompressed[start_pos:end_pos]
     xml_text <- decode_xml_raw(xml_raw)
@@ -127,6 +163,8 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
       subject_area = subject_area,
       xml_text = xml_text
     )
+
+    if (progress) utils::setTxtProgressBar(progress_bar, i)
   }
   
   out <- data.frame(
