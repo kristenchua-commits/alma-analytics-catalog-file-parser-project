@@ -21,6 +21,35 @@ export_saved_column_review <- function(
     if (!nzchar(value)) NA_character_ else value
   }
   find_text <- function(node, xpath) clean_text(xml2::xml_find_first(node, xpath))
+  format_condition <- function(condition_node) {
+    expression <- xml2::xml_find_first(condition_node, "./*[local-name()='expr']")
+    if (inherits(expression, "xml_missing")) return(NA_character_)
+
+    expression_type <- xml2::xml_attr(expression, "type")
+    children <- xml2::xml_find_all(expression, "./*[local-name()='expr']")
+
+    # OBIEE list expressions store the field and every allowed value in
+    # separate child nodes. xml_text() concatenates them without delimiters,
+    # so join the parts explicitly for a readable spreadsheet criterion.
+    if (!is.na(expression_type) && grepl("list", expression_type, fixed = TRUE) &&
+        length(children)) {
+      parts <- vapply(children, clean_text, character(1))
+      parts <- parts[!is.na(parts) & nzchar(parts)]
+      if (!length(parts)) return(NA_character_)
+
+      operator <- xml2::xml_attr(expression, "op")
+      operator_label <- if (!is.na(operator) && operator == "notIn") {
+        " is not equal to / is not in "
+      } else {
+        " is equal to / is in "
+      }
+
+      if (length(parts) == 1L) return(paste0(parts[1L], operator_label))
+      return(paste0(parts[1L], operator_label, paste(parts[-1L], collapse = "; ")))
+    }
+
+    clean_text(expression)
+  }
 
   review_rows <- list()
   object_rows <- list()
@@ -48,7 +77,9 @@ export_saved_column_review <- function(
         review_rows[[length(review_rows) + 1L]] <- data.frame(
           saved_column_name = catalog$object_title[i],
           rule_id = paste0("SC", i, "-R", j),
-          bin_criterion = find_text(rules[[j]], ".//*[local-name()='condition']/*[local-name()='expr']"),
+          bin_criterion = format_condition(
+            xml2::xml_find_first(rules[[j]], ".//*[local-name()='condition']")
+          ),
           bin_label = find_text(rules[[j]], ".//*[local-name()='value']/*[local-name()='expr']"),
           explanation = "",
           base_formula = base_formula,
