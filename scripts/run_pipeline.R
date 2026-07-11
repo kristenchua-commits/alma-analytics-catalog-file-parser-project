@@ -5,6 +5,7 @@ source("scripts/extract_scripts/extract_XMLTagInventory.r")
 source("scripts/extract_scripts/extract_SavedColumn.R")
 source("scripts/extract_scripts/extract_XML_to_FilterObject.r")
 source("scripts/extract_scripts/export_filter_criteria.R")
+source("scripts/extract_scripts/export_filter_review.R")
 
 run_pipeline <- function(catalog_path, output_dir = "output") {
   if (!file.exists(catalog_path)) stop("Catalog file not found: ", catalog_path)
@@ -36,6 +37,12 @@ run_pipeline <- function(catalog_path, output_dir = "output") {
       file.path(output_dir, "filter_objects_summary.csv")
     )
     export_filter_criteria(filter_rds, file.path(output_dir, "filter_criteria.csv"))
+    export_filter_review(
+      filter_rds,
+      file.path(output_dir, "filter_review.xlsx"),
+      file.path(output_dir, "filter_review.csv"),
+      file.path(output_dir, "filter_review_value_lists.csv")
+    )
   } else {
     message("No filter objects; skipping filter outputs")
   }

@@ -69,6 +69,8 @@ parent/depth fields that preserve the filter's logical structure.
 | `filter_objects.rds` | Full filter objects including XML |
 | `filter_objects_summary.csv` | Spreadsheet-friendly filter object metadata |
 | `filter_criteria.csv` | Flattened filter expressions and criteria |
+| `filter_review.xlsx` | Concise documentation workbook with one row per business rule |
+| `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
 
 Generated outputs are ignored by Git. Keep representative fixtures only when
 they are deliberately needed for tests or documentation.
