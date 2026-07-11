@@ -66,6 +66,7 @@ parent/depth fields that preserve the filter's logical structure.
 | `catalog_metadata_inventory.csv` | Counts and missing-field checks by object pattern |
 | `xml_tag_inventory.csv` | XML tags, paths, depths, attributes, and values |
 | `saved_columns.csv` | Parsed saved-column definitions |
+| `saved_column_review.xlsx` | Readable bin criteria, labels, and explanation fields |
 | `filter_objects.rds` | Full filter objects including XML |
 | `filter_objects_summary.csv` | Spreadsheet-friendly filter object metadata |
 | `filter_criteria.csv` | Flattened filter expressions and criteria |

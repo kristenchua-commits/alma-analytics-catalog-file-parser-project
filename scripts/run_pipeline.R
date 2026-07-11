@@ -6,6 +6,7 @@ source("scripts/extract_scripts/extract_SavedColumn.R")
 source("scripts/extract_scripts/extract_XML_to_FilterObject.r")
 source("scripts/extract_scripts/export_filter_criteria.R")
 source("scripts/extract_scripts/export_filter_review.R")
+source("scripts/extract_scripts/export_saved_column_review.R")
 
 run_pipeline <- function(catalog_path, output_dir = "output") {
   if (!file.exists(catalog_path)) stop("Catalog file not found: ", catalog_path)
@@ -25,6 +26,11 @@ run_pipeline <- function(catalog_path, output_dir = "output") {
   catalog <- readRDS(catalog_rds)
   if (any(catalog$object_kind == "saved_column")) {
     extract_saved_columns(catalog_rds, file.path(output_dir, "saved_columns.csv"))
+    export_saved_column_review(
+      catalog_rds,
+      file.path(output_dir, "saved_column_review.xlsx"),
+      file.path(output_dir, "saved_column_review.csv")
+    )
   } else {
     message("No saved-column objects; skipping saved_columns.csv")
   }
