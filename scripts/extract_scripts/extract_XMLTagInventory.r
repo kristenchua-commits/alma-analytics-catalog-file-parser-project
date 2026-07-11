@@ -1,74 +1,59 @@
-# =========================================================
-# Extract unique XML tags from a .catalog file
-# =========================================================
+# Stage 2 inventory: list XML element paths, depths, attributes, and values.
+extract_xml_tag_inventory <- function(
+    input_path = "output/catalog_extract.rds",
+    output_path = "output/xml_tag_inventory.csv") {
+  if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
+  if (!file.exists(input_path)) stop("Missing input file: ", input_path)
+  catalog <- readRDS(input_path)
+  if (!"xml_text" %in% names(catalog)) stop("Input must contain xml_text.")
 
-library(stringr)
-library(xml2)
-library(tibble)
-library(readr)
-#list.files()
-
-setwd("/Users/kchua/GitHub/alma-analytics-dot-catalog-parser")
-source("scripts/script_helper_functions/read_catalog_file.R")
-
-#### Uncomment to specify the name of the catalog file .catalog file
-CampusLibraryCategorization_catalog_file <- "Physical Preparation Review - Campus Library Categorization Reports.catalog"
-#Filters_catalog_file <- "FiltersAnnualStatistics2025-26.catalog"
-#CheckOutTypeandUserGroup_catalog_file <- "Fulfillment Preparation Review Report - Check Out Type and User Group - Campus Categorization Reports.catalog"
-#EResourceLibraryCategorization_catalog_file <- "Electronic preparation review reports - Campus EResource Library Categorization Reports.catalog"
-#PhysicalCampusLibraryCategorization_catalog_file <- "Physical Preparation Review - Campus Library Categorization Reports.catalog
-# Read and clean selected .catalog file
-clean_text <- read_catalog_file(campus_library_categorization_catalog_file)
-
-# Extract XML blocks from the catalog text
-xml_blocks <- str_extract_all(
-  clean_text,
-  '(?s)<\\?xml.*?(?=<\\?xml|$)'
-)[[1]]
-
-# Helper: safely read XML block
-read_xml_block <- function(xml_block) {
-  tryCatch(
-    read_xml(xml_block),
-    error = function(e) NULL
-  )
-}
-
-# Helper: extract unique tags from one XML block
-extract_xml_tags <- function(xml_block, block_number) {
-  doc <- read_xml_block(xml_block)
-  
-  if (is.null(doc)) {
-    return(tibble(
-      xml_block_number = block_number,
-      tag_name = NA_character_,
-      status = "could_not_parse"
-    ))
+  clean_values <- function(value) {
+    value <- trimws(gsub("[[:space:]]+", " ", value))
+    value[!nzchar(value)] <- NA_character_
+    value
   }
-  
-  tags <- unique(xml_name(xml_find_all(doc, ".//*")))
-  
-  tibble(
-    xml_block_number = block_number,
-    tag_name = tags,
-    status = "parsed"
-  )
+  format_attributes <- function(node) {
+    attrs <- xml2::xml_attrs(node)
+    if (!length(attrs)) return(NA_character_)
+    paste(paste0(names(attrs), "=", attrs), collapse = "; ")
+  }
+
+  rows <- list()
+  for (i in seq_len(nrow(catalog))) {
+    doc <- tryCatch(xml2::read_xml(catalog$xml_text[i]), error = function(e) NULL)
+    if (is.null(doc)) next
+    nodes <- xml2::xml_find_all(doc, ".//*")
+    if (!length(nodes)) next
+    paths <- xml2::xml_path(nodes)
+    depths <- lengths(regmatches(paths, gregexpr("/", paths, fixed = TRUE))) - 1L
+    values <- rep(NA_character_, length(nodes))
+    leaf <- xml2::xml_length(nodes) == 0L
+    values[leaf] <- clean_values(xml2::xml_text(nodes[leaf]))
+    rows[[length(rows) + 1L]] <- data.frame(
+      catalog_index = catalog$catalog_index[i],
+      object_title = catalog$object_title[i],
+      object_kind = catalog$object_kind[i],
+      node_index = seq_along(nodes),
+      tag_name = xml2::xml_name(nodes),
+      nesting_level = depths,
+      tag_path = paths,
+      attributes = vapply(nodes, format_attributes, character(1)),
+      value = values,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (!length(rows)) stop("No XML tags were extracted.")
+  inventory <- do.call(rbind, rows)
+  dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
+  write.csv(inventory, output_path, row.names = FALSE, na = "")
+  message("Wrote ", output_path, " (", nrow(inventory), " tags)")
+  invisible(inventory)
 }
 
-# Extract tags from all XML blocks
-tag_list <- lapply(
-  seq_along(xml_blocks),
-  function(i) extract_xml_tags(xml_blocks[[i]], i)
-)
-
-tag_sheet <- dplyr::bind_rows(tag_list)
-
-# Save output
-write_csv(
-  tag_sheet,
-  "ALMA_Analytics_XML_Tags_from_selected_catalog_file.csv"
-)
-
-# Print results
-cat("Saved: ALMA_Analytics_XML_Tags_from_selected_catalog_file.csv\n\n")
-print(tag_sheet, n = 100)
+if (sys.nframe() == 0L) {
+  args <- commandArgs(trailingOnly = TRUE)
+  extract_xml_tag_inventory(
+    if (length(args)) args[1L] else "output/catalog_extract.rds",
+    if (length(args) > 1L) args[2L] else "output/xml_tag_inventory.csv"
+  )
+}

@@ -1,89 +1,108 @@
-read_catalog_metadata <- function(catalog_file, keep_strings = FALSE) {
-  if (!exists("read_catalog_file")) {
-    source("scripts/script_helper_functions/read_catalog_file.R")
+# Extract one metadata row for every XML object returned by read_catalog_file().
+read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
+  if (is.character(catalog) && length(catalog) == 1L) {
+    if (!exists("read_catalog_file", mode = "function")) {
+      source("scripts/script_helper_functions/read_catalog_file.R")
+    }
+    catalog <- read_catalog_file(catalog, keep_strings = TRUE)
   }
-  
-  catalog <- read_catalog_file(catalog_file, keep_xml = FALSE, keep_strings = TRUE)
-  
+
+  if (!is.data.frame(catalog) || !"xml_root_name" %in% names(catalog)) {
+    stop("catalog must be a .catalog path or the output of read_catalog_file().")
+  }
+
   strings <- attr(catalog, "catalog_strings")
   if (is.null(strings) || !length(strings)) {
-    stop("No printable strings found in the catalog file.")
+    stop("Catalog strings are unavailable. Call read_catalog_file(..., keep_strings = TRUE).")
   }
-  
-  meta_strings <- strings[grepl('"ItemName"\\s*:', strings, perl = TRUE)]
-  meta_strings <- unique(meta_strings)
-  
-  if (!length(meta_strings)) {
-    stop("No metadata records with ItemName found in the catalog file.")
+
+  metadata_strings <- unique(strings[grepl('"ItemName"\\s*:', strings, perl = TRUE)])
+  object_metadata <- metadata_strings[
+    grepl('"ObjectSignature"\\s*:\\s*"[^"]+"', metadata_strings, perl = TRUE)
+  ]
+
+  if (length(object_metadata) != nrow(catalog)) {
+    stop(
+      "Found ", length(object_metadata), " object metadata records for ",
+      nrow(catalog), " XML objects; rows cannot be matched safely."
+    )
   }
-  
+
   unescape_json_string <- function(x) {
-    x <- gsub("\\\\\\\\", "\\\\", x, perl = TRUE)
-    x <- gsub("\\\\\"", "\"", x, perl = TRUE)
-    x <- gsub("\\\\/", "/", x, perl = TRUE)
-    x
+    x <- gsub("\\\\/", "/", x, fixed = TRUE)
+    x <- gsub('\\\\"', '"', x, fixed = TRUE)
+    gsub("\\\\\\\\", "\\\\", x, fixed = TRUE)
   }
-  
-  extract_json_string_field <- function(txt, field) {
-    pat <- paste0('"', field, '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')
-    m <- regexec(pat, txt, perl = TRUE)
-    hit <- regmatches(txt, m)[[1]]
-    
-    if (length(hit) < 2) return(NA_character_)
-    unescape_json_string(hit[2])
+
+  extract_string <- function(text, field) {
+    pattern <- paste0('"', field, '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')
+    match <- regexec(pattern, text, perl = TRUE)
+    value <- regmatches(text, match)[[1L]]
+    if (length(value) < 2L) return(NA_character_)
+    unescape_json_string(value[2L])
   }
-  
-  extract_json_number_field <- function(txt, field) {
-    pat <- paste0('"', field, '"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)')
-    m <- regexec(pat, txt, perl = TRUE)
-    hit <- regmatches(txt, m)[[1]]
-    
-    if (length(hit) < 2) return(NA_real_)
-    as.numeric(hit[2])
+
+  extract_number <- function(text, field) {
+    pattern <- paste0('"', field, '"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)')
+    match <- regexec(pattern, text, perl = TRUE)
+    value <- regmatches(text, match)[[1L]]
+    if (length(value) < 2L) return(NA_real_)
+    as.numeric(value[2L])
   }
-  
-  extract_json_nested_id <- function(txt, field) {
-    pat <- paste0('"', field, '"\\s*:\\s*\\{[^\\{\\}]*?"ID"\\s*:\\s*"([^"]+)"')
-    m <- regexec(pat, txt, perl = TRUE)
-    hit <- regmatches(txt, m)[[1]]
-    
-    if (length(hit) < 2) return(NA_character_)
-    hit[2]
+
+  extract_nested_id <- function(text, field) {
+    pattern <- paste0('"', field, '"\\s*:\\s*\\{[^{}]*?"ID"\\s*:\\s*"([^"]+)"')
+    match <- regexec(pattern, text, perl = TRUE)
+    value <- regmatches(text, match)[[1L]]
+    if (length(value) < 2L) return(NA_character_)
+    value[2L]
   }
-  
-  rows <- lapply(seq_along(meta_strings), function(i) {
-    txt <- meta_strings[[i]]
-    
+
+  classify_object <- function(root_name, signature) {
+    if (grepl("filter", root_name, ignore.case = TRUE) ||
+        grepl("filter", signature, ignore.case = TRUE)) return("filter")
+    if (grepl("column", root_name, ignore.case = TRUE) ||
+        grepl("column", signature, ignore.case = TRUE)) return("saved_column")
+    if (identical(root_name, "dashboardPage")) return("dashboard_page")
+    if (identical(root_name, "dashboard")) return("dashboard")
+    if (identical(root_name, "report")) return("report")
+    "other"
+  }
+
+  rows <- lapply(seq_along(object_metadata), function(i) {
+    text <- object_metadata[[i]]
+    signature <- extract_string(text, "ObjectSignature")
+    root_name <- catalog$xml_root_name[i]
+
     data.frame(
       catalog_index = i,
-      source_file_name = basename(catalog_file),
-      item_name = extract_json_string_field(txt, "ItemName"),
-      original_path = extract_json_string_field(txt, "OriginalPath"),
-      object_signature = extract_json_string_field(txt, "ObjectSignature"),
-      owner_id = extract_json_nested_id(txt, "OwnerId"),
-      creator_id = extract_json_nested_id(txt, "CreatorId"),
-      item_type_code = extract_json_number_field(txt, "ItemType"),
-      created_year = extract_json_number_field(txt, "Year"),
-      created_month = extract_json_number_field(txt, "Month"),
-      created_day = extract_json_number_field(txt, "Day"),
-      created_hour = extract_json_number_field(txt, "Hour"),
-      created_minute = extract_json_number_field(txt, "Minute"),
-      created_second = extract_json_number_field(txt, "Second"),
-      wc_build = extract_json_string_field(txt, "Build"),
-      wc_desc = extract_json_string_field(txt, "Desc"),
+      source_file_name = catalog$source_file_name[i],
+      object_title = extract_string(text, "ItemName"),
+      object_kind = classify_object(root_name, signature),
+      xml_root_name = root_name,
+      original_path = extract_string(text, "OriginalPath"),
+      object_signature = signature,
+      subject_area = catalog$subject_area[i],
+      owner_id = extract_nested_id(text, "OwnerId"),
+      creator_id = extract_nested_id(text, "CreatorId"),
+      item_type_code = extract_number(text, "ItemType"),
+      created_year = extract_number(text, "Year"),
+      created_month = extract_number(text, "Month"),
+      created_day = extract_number(text, "Day"),
+      created_hour = extract_number(text, "Hour"),
+      created_minute = extract_number(text, "Minute"),
+      created_second = extract_number(text, "Second"),
+      web_catalog_build = extract_string(text, "Build"),
+      web_catalog_description = extract_string(text, "Desc"),
       stringsAsFactors = FALSE
     )
   })
-  
+
   out <- do.call(rbind, rows)
-  
   if (keep_strings) {
     attr(out, "catalog_strings") <- strings
-    attr(out, "metadata_strings") <- meta_strings
+    attr(out, "metadata_strings") <- object_metadata
   }
-  
-  attr(out, "source_path") <- catalog_file
-  attr(out, "source_file_name") <- basename(catalog_file)
-  
+  attr(out, "source_path") <- attr(catalog, "source_path")
   out
 }

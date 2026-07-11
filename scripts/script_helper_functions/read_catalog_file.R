@@ -1,5 +1,3 @@
-### a function, is not calling a specific file yet, will need to activate in another script###
-
 decode_xml_raw <- function(xml_raw) {
   tf <- tempfile(fileext = ".bin")
   on.exit(unlink(tf), add = TRUE)
@@ -26,6 +24,9 @@ decode_xml_raw <- function(xml_raw) {
 
 read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRUE,
                               progress = interactive()) {
+  if (!requireNamespace("xml2", quietly = TRUE)) {
+    stop("Package 'xml2' is required.")
+  }
   if (!file.exists(catalog_file)) {
     stop("Catalog file not found: ", catalog_file)
   }
@@ -74,6 +75,36 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
     
     unique(out)
   }
+
+  extract_item_name <- function(value) {
+    if (!length(value)) return(NA_character_)
+
+    if (is.raw(value)) {
+      # Metadata records are followed by binary separator bytes. Stop at the
+      # first separator before converting the JSON record to text.
+      byte_values <- as.integer(value)
+      separators <- which(byte_values < 32L & !byte_values %in% c(9L, 10L, 13L))
+      if (length(separators)) {
+        if (separators[1L] == 1L) return(NA_character_)
+        value <- value[seq_len(separators[1L] - 1L)]
+      }
+      metadata_text <- rawToChar(value)
+    } else {
+      metadata_text <- value
+    }
+    match <- regexec(
+      '"ItemName"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"',
+      metadata_text,
+      perl = TRUE
+    )
+    value <- regmatches(metadata_text, match)[[1L]]
+    if (length(value) < 2L) return(NA_character_)
+
+    title <- value[2L]
+    title <- gsub("\\\\/", "/", title, fixed = TRUE)
+    title <- gsub('\\\\"', '"', title, fixed = TRUE)
+    gsub("\\\\\\\\", "\\\\", title, fixed = TRUE)
+  }
   
   raw_file <- readBin(catalog_file, what = "raw", n = file.info(catalog_file)$size)
   
@@ -88,6 +119,15 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
       )
     }
   )
+
+  catalog_strings <- extract_ascii_strings(raw_decompressed, min_len = 8L)
+  metadata_strings <- catalog_strings[
+    grepl('"ItemName"\\s*:', catalog_strings, perl = TRUE)
+  ]
+  object_metadata <- metadata_strings[
+    grepl('"ObjectSignature"\\s*:\\s*"[^"]+"', metadata_strings, perl = TRUE)
+  ]
+  object_titles <- vapply(object_metadata, extract_item_name, character(1))
   
   xml_start_pat <- charToRaw("<?xml")
   meta_start_pat <- charToRaw('{"ACL"')
@@ -99,6 +139,13 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
   
   if (!length(starts)) {
     stop("No XML found inside catalog file.")
+  }
+
+  if (length(object_titles) != length(starts)) {
+    stop(
+      "Found ", length(starts), " XML documents but ", length(object_titles),
+      " object titles; catalog metadata could not be matched safely."
+    )
   }
   
   rows <- vector("list", length(starts))
@@ -123,7 +170,7 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
     } else {
       integer(0)
     }
-    
+
     end_pos <- next_xml_start - 1L
     if (length(meta_after)) {
       end_pos <- min(end_pos, meta_after[1L] - 1L)
@@ -160,6 +207,7 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
       catalog_index = i,
       source_file_name = basename(catalog_file),
       xml_root_name = xml2::xml_name(root),
+      object_title = object_titles[i],
       subject_area = subject_area,
       xml_text = xml_text
     )
@@ -171,6 +219,7 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
     catalog_index = vapply(rows, `[[`, integer(1), "catalog_index"),
     source_file_name = vapply(rows, `[[`, character(1), "source_file_name"),
     xml_root_name = vapply(rows, `[[`, character(1), "xml_root_name"),
+    object_title = vapply(rows, `[[`, character(1), "object_title"),
     subject_area = vapply(rows, `[[`, character(1), "subject_area"),
     stringsAsFactors = FALSE
   )
@@ -182,7 +231,7 @@ read_catalog_file <- function(catalog_file, keep_xml = FALSE, keep_strings = TRU
   }
   
   if (keep_strings) {
-    attr(out, "catalog_strings") <- extract_ascii_strings(raw_decompressed, min_len = 8L)
+    attr(out, "catalog_strings") <- catalog_strings
   }
   
   attr(out, "source_file_name") <- basename(catalog_file)

@@ -1,150 +1,69 @@
-# scripts/extract_SavedColumn.R
+# Stage 2: flatten column definitions from saved-column objects.
+extract_saved_columns <- function(
+    input_path = "output/catalog_extract.rds",
+    output_path = "output/saved_columns.csv") {
+  if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
+  if (!file.exists(input_path)) stop("Missing input file: ", input_path)
+  catalog <- readRDS(input_path)
+  required <- c("catalog_index", "object_kind", "object_title", "xml_text")
+  missing <- setdiff(required, names(catalog))
+  if (length(missing)) stop("Input is missing columns: ", paste(missing, collapse = ", "))
 
-library(xml2)
+  catalog <- catalog[catalog$object_kind == "saved_column", , drop = FALSE]
+  if (!nrow(catalog)) stop("No saved-column objects were found.")
 
-input_path <- "output/catalog_extract.rds"
-output_path <- "output/saved_columns.csv"
-
-if (!file.exists(input_path)) {
-  stop("Missing input file: ", input_path, "\nRun extract_XMLFileList.r first.")
-}
-
-catalog_all <- readRDS(input_path)
-
-if (!"xml_text" %in% names(catalog_all)) {
-  stop("Input data must contain an xml_text column.")
-}
-
-default_if_missing <- function(x, default) {
-  if (is.null(x) || length(x) == 0 || all(is.na(x)) || !nzchar(x[1])) {
-    default
-  } else {
-    x[1]
+  clean_text <- function(node) {
+    value <- trimws(gsub("[[:space:]]+", " ", xml2::xml_text(node)))
+    if (!nzchar(value)) NA_character_ else value
   }
-}
-
-clean_one_line <- function(x) {
-  x <- as.character(x)
-  x <- gsub("[\r\n\t]+", " ", x)
-  x <- gsub("\\s+", " ", x)
-  trimws(x)
-}
-
-safe_attr <- function(node, attr_name) {
-  if (is.null(node) || length(node) == 0) return(NA_character_)
-  
-  val <- xml_attr(node, attr_name)
-  if (is.na(val) || !nzchar(val)) return(NA_character_)
-  val
-}
-
-safe_xsi_type <- function(node) {
-  if (is.null(node) || length(node) == 0) return(NA_character_)
-  
-  val <- xml_attr(node, "xsi:type")
-  if (is.na(val) || !nzchar(val)) {
-    val <- xml_attr(node, "type")
+  safe_attr <- function(node, name) {
+    value <- xml2::xml_attr(node, name)
+    if (length(value) == 0L || is.na(value) || !nzchar(value)) NA_character_ else value
   }
-  
-  if (is.na(val) || !nzchar(val)) return(NA_character_)
-  val
-}
-
-saved_column_label <- function(node) {
-  if (is.null(node) || length(node) == 0) return(NA_character_)
-  
-  # Prefer meaningful attributes first
-  path <- safe_attr(node, "path")
-  if (!is.na(path)) return(path)
-  
-  column_id <- safe_attr(node, "columnID")
-  if (!is.na(column_id)) return(column_id)
-  
-  txt <- clean_one_line(xml_text(node))
-  if (nzchar(txt)) return(txt)
-  
-  NA_character_
-}
-
-saved_column_criteria <- function(node) {
-  if (is.null(node) || length(node) == 0) return(NA_character_)
-  
-  # Try descendant expr nodes first
-  expr_nodes <- xml_find_all(node, ".//*[local-name()='expr']")
-  if (length(expr_nodes)) {
-    txt <- clean_one_line(paste(xml_text(expr_nodes), collapse = " "))
-    if (nzchar(txt)) return(txt)
+  first_caption <- function(node) {
+    caption <- xml2::xml_find_first(node, ".//*[local-name()='caption']/*[local-name()='text']")
+    if (inherits(caption, "xml_missing")) NA_character_ else clean_text(caption)
   }
-  
-  txt <- clean_one_line(xml_text(node))
-  if (nzchar(txt)) return(txt)
-  
-  NA_character_
-}
 
-extract_saved_columns_from_doc <- function(doc, row_meta) {
-  col_nodes <- xml_find_all(doc, ".//*[local-name()='columns']//*[local-name()='column']")
-  
-  if (!length(col_nodes)) return(NULL)
-  
-  out <- vector("list", length(col_nodes))
-  
-  for (j in seq_along(col_nodes)) {
-    node <- col_nodes[[j]]
-    
-    out[[j]] <- data.frame(
-      saved_object_index = row_meta$catalog_index[1],
-      saved_column_index = j,
-      parent_saved_column_index = NA_integer_,
-      depth = 1L,
-      
-      source_file_name = row_meta$source_file_name[1],
-      item_name = row_meta$item_label[1],
-      subject_area = row_meta$subject_area[1],
-      original_path = row_meta$original_path[1],
-      
-      saved_column_name = saved_column_label(node),
-      column_id = safe_attr(node, "columnID"),
-      path = safe_attr(node, "path"),
-      xsi_type = safe_xsi_type(node),
-      operator = safe_attr(node, "op"),
-      criteria = saved_column_criteria(node),
-      
-      stringsAsFactors = FALSE
-    )
+  rows <- list()
+  for (i in seq_len(nrow(catalog))) {
+    doc <- tryCatch(xml2::read_xml(catalog$xml_text[i]), error = function(e) NULL)
+    if (is.null(doc)) next
+    nodes <- xml2::xml_find_all(doc, ".//*[local-name()='column']")
+    if (!length(nodes)) {
+      # Some saved-column objects describe one column directly at the root.
+      nodes <- xml2::xml_root(doc)
+    }
+    rows[[length(rows) + 1L]] <- do.call(rbind, lapply(seq_along(nodes), function(j) {
+      node <- nodes[[j]]
+      expr <- xml2::xml_find_first(node, ".//*[local-name()='expr']")
+      data.frame(
+        catalog_index = catalog$catalog_index[i],
+        saved_column_index = j,
+        object_title = catalog$object_title[i],
+        subject_area = catalog$subject_area[i],
+        original_path = catalog$original_path[i],
+        column_caption = first_caption(node),
+        column_id = safe_attr(node, "columnID"),
+        column_path = safe_attr(node, "path"),
+        data_type = safe_attr(node, "type"),
+        formula = if (inherits(expr, "xml_missing")) NA_character_ else clean_text(expr),
+        stringsAsFactors = FALSE
+      )
+    }))
   }
-  
-  do.call(rbind, out)
+  if (!length(rows)) stop("No saved-column rows were extracted.")
+  saved_columns <- do.call(rbind, rows)
+  dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
+  write.csv(saved_columns, output_path, row.names = FALSE, na = "")
+  message("Wrote ", output_path, " (", nrow(saved_columns), " rows)")
+  invisible(saved_columns)
 }
 
-all_rows <- list()
-
-for (i in seq_len(nrow(catalog_all))) {
-  row <- catalog_all[i, , drop = FALSE]
-  xml_txt <- as.character(row$xml_text[1])
-  
-  if (is.na(xml_txt) || !nzchar(xml_txt)) next
-  
-  doc <- tryCatch(
-    read_xml(xml_txt),
-    error = function(e) NULL
+if (sys.nframe() == 0L) {
+  args <- commandArgs(trailingOnly = TRUE)
+  extract_saved_columns(
+    if (length(args)) args[1L] else "output/catalog_extract.rds",
+    if (length(args) > 1L) args[2L] else "output/saved_columns.csv"
   )
-  if (is.null(doc)) next
-  
-  block_df <- extract_saved_columns_from_doc(doc, row)
-  if (is.null(block_df) || nrow(block_df) == 0) next
-  
-  all_rows[[length(all_rows) + 1L]] <- block_df
 }
-
-if (!length(all_rows)) {
-  stop("No saved columns were extracted.")
-}
-
-final_df <- do.call(rbind, all_rows)
-
-dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
-write.csv(final_df, output_path, row.names = FALSE)
-
-cat("Wrote:", output_path, "\n")
-cat("Rows:", nrow(final_df), "\n")
