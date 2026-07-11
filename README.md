@@ -19,6 +19,16 @@ From the repository root:
 Rscript scripts/run_pipeline.R "data/Annual Stats FY 2025-2026.catalog"
 ```
 
+### Choose a file interactively in RStudio
+
+The wrapper searches both `data/` in this repository and your `~/Downloads`
+folder. It also provides a file-browser option for files stored elsewhere.
+
+```r
+source("choose_catalog_file_and_run_pipeline.R")
+catalog <- run_catalog_pipeline()
+```
+
 The pipeline has three stages.
 
 ### 1. Extract XML objects and metadata

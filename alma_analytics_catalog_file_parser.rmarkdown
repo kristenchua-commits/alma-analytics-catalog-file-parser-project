@@ -8,12 +8,29 @@ params:
 
 ## Run the pipeline
 
-This report uses a parameter instead of an interactive file picker, so it can be
-rendered reproducibly from RStudio or the command line.
+The user-facing wrapper is `choose_catalog_file_and_run_pipeline.R`. When used
+interactively in RStudio, calling `run_catalog_pipeline()` without a path opens
+a menu containing `.catalog` files from the repository's `data/` directory and
+the user's `~/Downloads` directory.
+
+This report supplies the `catalog_file` parameter explicitly instead of opening
+that menu, which keeps the report reproducible when rendered from RStudio or the
+command line.
 
 ```{r setup}
-source("scripts/run_pipeline.R")
-catalog <- run_pipeline(params$catalog_file, params$output_dir)
+source("choose_catalog_file_and_run_pipeline.R")
+
+catalog <- run_catalog_pipeline(
+  catalog_path = params$catalog_file,
+  output_dir = params$output_dir
+)
+```
+
+To choose a file interactively in the RStudio Console instead, run:
+
+```{r interactive-example, eval=FALSE}
+source("choose_catalog_file_and_run_pipeline.R")
+catalog <- run_catalog_pipeline()
 ```
 
 ## Catalog summary
@@ -21,7 +38,7 @@ catalog <- run_pipeline(params$catalog_file, params$output_dir)
 ```{r catalog-summary}
 catalog[c(
   "catalog_index", "object_title", "object_kind", "xml_root_name",
-  "subject_area", "original_path"
+  "closest_folder", "closest_level_object", "subject_area", "original_path"
 )]
 ```
 

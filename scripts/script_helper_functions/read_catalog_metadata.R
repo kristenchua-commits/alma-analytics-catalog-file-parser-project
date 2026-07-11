@@ -69,10 +69,32 @@ read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
     "other"
   }
 
+  closest_folder_from_path <- function(path) {
+    if (is.na(path) || !nzchar(path)) return(NA_character_)
+    path <- sub("/+$", "", gsub("\\\\", "/", path))
+    parent_path <- dirname(path)
+    if (!nzchar(parent_path) || parent_path %in% c(".", "/")) return(NA_character_)
+    basename(parent_path)
+  }
+
+  hierarchy_paths <- vapply(
+    metadata_strings,
+    extract_string,
+    character(1),
+    field = "OriginalPath"
+  )
+  hierarchy_titles <- vapply(
+    metadata_strings,
+    extract_string,
+    character(1),
+    field = "ItemName"
+  )
+
   rows <- lapply(seq_along(object_metadata), function(i) {
     text <- object_metadata[[i]]
     signature <- extract_string(text, "ObjectSignature")
     root_name <- catalog$xml_root_name[i]
+    original_path <- extract_string(text, "OriginalPath")
 
     data.frame(
       catalog_index = i,
@@ -80,7 +102,8 @@ read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
       object_title = extract_string(text, "ItemName"),
       object_kind = classify_object(root_name, signature),
       xml_root_name = root_name,
-      original_path = extract_string(text, "OriginalPath"),
+      closest_folder = closest_folder_from_path(original_path),
+      original_path = original_path,
       object_signature = signature,
       subject_area = catalog$subject_area[i],
       owner_id = extract_nested_id(text, "OwnerId"),
@@ -99,6 +122,34 @@ read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
   })
 
   out <- do.call(rbind, rows)
+
+  # Match each XML object to the nearest containing catalog item. Containers
+  # such as dashboard/report folders exist in catalog metadata even when they
+  # do not have their own embedded XML block.
+  out$closest_level_object <- vapply(seq_len(nrow(out)), function(i) {
+    current_path <- sub("/+$", "", out$original_path[i])
+    if (is.na(current_path) || !nzchar(current_path)) return(NA_character_)
+
+    candidate_paths <- sub("/+$", "", hierarchy_paths)
+    path_matches <- vapply(candidate_paths, function(candidate_path) {
+      !is.na(candidate_path) && nzchar(candidate_path) &&
+        startsWith(current_path, paste0(candidate_path, "/"))
+    }, logical(1))
+    candidates <- which(path_matches)
+    if (!length(candidates)) return(NA_character_)
+
+    closest <- candidates[which.max(nchar(candidate_paths[candidates]))]
+    hierarchy_titles[closest]
+  }, character(1))
+
+  # Keep hierarchy fields adjacent to the object's identifying columns.
+  hierarchy_position <- match("closest_folder", names(out))
+  out <- out[c(
+    names(out)[seq_len(hierarchy_position)],
+    "closest_level_object",
+    setdiff(names(out)[(hierarchy_position + 1L):ncol(out)], "closest_level_object")
+  )]
+
   if (keep_strings) {
     attr(out, "catalog_strings") <- strings
     attr(out, "metadata_strings") <- object_metadata
