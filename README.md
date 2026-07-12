@@ -4,6 +4,9 @@ R utilities for extracting and reviewing objects embedded in Ex Libris Alma
 Analytics `.catalog` files. The pipeline preserves full XML in RDS files and
 writes spreadsheet-friendly CSV files without the large `xml_text` column.
 
+For a GitHub-rendered notebook walkthrough with annotations, R code cells, and
+saved example outputs, open `alma_analytics_catalog_file_parser.ipynb`.
+
 ## Requirements
 
 - R 4.1 or newer
