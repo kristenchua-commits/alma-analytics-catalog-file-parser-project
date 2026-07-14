@@ -89,17 +89,3 @@ parent/depth fields that preserve the filter's logical structure.
 Generated outputs are ignored by Git. Keep representative fixtures only when
 they are deliberately needed for tests or documentation.
 
-## Recommended repository cleanup
-
-After reviewing any local changes, delete or untrack:
-
-- `.DS_Store` files throughout the repository
-- `.RData`, `.Rhistory`, and `.Rproj.user/` IDE state
-- generated `analysis.html` and `analysis_files/`
-- generated files under `output/`
-- duplicate catalog copies under multiple `data/` subdirectories
-- the old Google Drive workflow reference once its useful source material has
-  been migrated into this repository
-
-Do not delete the `.catalog` test fixtures until a smaller, non-sensitive test
-fixture is available.
