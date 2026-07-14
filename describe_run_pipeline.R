@@ -2,9 +2,11 @@
 
 describe_run_pipeline <- function(
     output_path = "output/run_pipeline_diagram.png",
-    width = 14,
-    height = 9.5) {
+    width = 16,
+    height = 12) {
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
+  
+  #Marri is so cool
 
   extension <- tolower(tools::file_ext(output_path))
   if (extension == "png") {
@@ -25,7 +27,7 @@ describe_run_pipeline <- function(
     bg = "white"
   )
   graphics::plot.new()
-  graphics::plot.window(xlim = c(0, 14), ylim = c(0, 10), asp = 1)
+  graphics::plot.window(xlim = c(0, 16), ylim = c(0, 12), asp = 1)
 
   palette <- list(
     input = "#DCEBFA",
@@ -69,73 +71,120 @@ describe_run_pipeline <- function(
   }
 
   graphics::text(
-    7, 9.72,
+    8, 11.72,
     "Alma Analytics Catalog Parser Pipeline",
     font = 2, cex = 1.35, col = palette$text
   )
   graphics::text(
-    7, 9.38,
-    "Input, processing stages, intermediate datasets, and review outputs",
+    8, 11.38,
+    "Complete script, input, intermediate dataset, and output map",
     cex = 0.82, col = palette$arrow
   )
 
-  # Input and shared extraction stage.
-  draw_box(7, 8.75, 3.2, 0.6, "Raw Alma Analytics .catalog file",
+  # Entry points and input.
+  draw_box(4.4, 10.65, 4.5, 0.72,
+           "Optional interactive entry point\nchoose_catalog_file_and_run_pipeline.R",
+           palette$process, font = 2, cex = 0.72)
+  draw_box(11.6, 10.65, 3.8, 0.72, "Raw Alma Analytics .catalog file",
            palette$input, font = 2, cex = 0.88)
-  draw_box(7, 7.72, 4.1, 0.72,
-           "Extract XML objects + align catalog metadata\nextract_XMLFileList.R",
-           palette$process, font = 2)
-  draw_box(7, 6.62, 3.8, 0.72,
+  draw_box(8, 9.55, 4.4, 0.72,
+           "Pipeline orchestrator\nscripts/run_pipeline.R",
+           palette$process, font = 2, cex = 0.78)
+  connect(4.4, 10.65, 8, 9.55, 0.36, 0.36)
+  connect(11.6, 10.65, 8, 9.55, 0.36, 0.36)
+
+  # Shared extraction stage and its helper scripts.
+  draw_box(8, 8.35, 7.4, 0.95,
+           paste(
+             "Extract XML objects + align catalog metadata",
+             "scripts/extract_scripts/extract_XMLFileList.R",
+             "scripts/script_helper_functions/read_catalog_file.R",
+             "scripts/script_helper_functions/read_catalog_metadata.R",
+             sep = "\n"
+           ),
+           palette$process, font = 2, cex = 0.64)
+  draw_box(8, 7.05, 4.5, 0.78,
            "catalog_extract.rds\ncatalog_extract_summary.csv",
            palette$intermediate, font = 2)
-  connect(7, 8.75, 7, 7.72, 0.30, 0.36)
-  connect(7, 7.72, 7, 6.62, 0.36, 0.36)
+  connect(8, 9.55, 8, 8.35, 0.36, 0.48)
+  connect(8, 8.35, 8, 7.05, 0.48, 0.39)
 
   # Three downstream branches.
-  draw_box(2.25, 5.35, 3.3, 0.76,
-           "Optional inspection\nmetadata + XML tag inventory",
-           palette$diagnostic, font = 2)
-  draw_box(7, 5.35, 3.3, 0.76,
-           "Saved-column parsing\nclassification and bin rules",
-           palette$process, font = 2)
-  draw_box(11.65, 5.35, 3.3, 0.76,
-           "Filter-object selection\nand criteria parsing",
-           palette$process, font = 2)
-  connect(7, 6.62, 2.25, 5.35, 0.36, 0.38)
-  connect(7, 6.62, 7, 5.35, 0.36, 0.38)
-  connect(7, 6.62, 11.65, 5.35, 0.36, 0.38)
+  draw_box(2.45, 5.65, 4.25, 1.15,
+           paste(
+             "Inspection and tag inventory",
+             "scripts/inventory/inspect_catalog_metadata.R",
+             "scripts/extract_scripts/extract_XMLTagInventory.r",
+             sep = "\n"
+           ),
+           palette$diagnostic, font = 2, cex = 0.66)
+  draw_box(7.15, 5.65, 4.25, 1.15,
+           paste(
+             "Saved-column parsing and review",
+             "scripts/extract_scripts/extract_SavedColumn.R",
+             "scripts/extract_scripts/export_saved_column_review.R",
+             sep = "\n"
+           ),
+           palette$process, font = 2, cex = 0.66)
+  draw_box(12.45, 5.78, 5.0, 0.9,
+           paste(
+             "Filter-object selection",
+             "scripts/extract_scripts/extract_XML_to_FilterObject.r",
+             sep = "\n"
+           ),
+           palette$process, font = 2, cex = 0.69)
+  connect(8, 7.05, 2.45, 5.65, 0.39, 0.58)
+  connect(8, 7.05, 7.15, 5.65, 0.39, 0.58)
+  connect(8, 7.05, 12.45, 5.78, 0.39, 0.45)
 
-  # Optional diagnostic branch.
-  draw_box(2.25, 4.05, 3.5, 0.9,
+  # Inspection outputs.
+  draw_box(2.45, 4.05, 4.15, 0.9,
            "Technical outputs\ncatalog_metadata_inventory.csv\nxml_tag_inventory.csv",
            palette$diagnostic)
-  connect(2.25, 5.35, 2.25, 4.05, 0.38, 0.45)
+  connect(2.45, 5.65, 2.45, 4.05, 0.58, 0.45)
 
-  # Saved-column branch.
-  draw_box(7, 4.05, 3.55, 0.9,
-           "Saved-column review\nsaved_column_review.xlsx\nsaved_column_review.csv",
+  # Saved-column outputs.
+  draw_box(7.15, 4.0, 4.25, 1.05,
+           paste(
+             "Saved-column outputs",
+             "saved_columns.csv",
+             "saved_column_review.xlsx",
+             "saved_column_review.csv",
+             sep = "\n"
+           ),
            palette$final, font = 2)
-  connect(7, 5.35, 7, 4.05, 0.38, 0.45)
+  connect(7.15, 5.65, 7.15, 4.0, 0.58, 0.53)
 
-  # Filter branch has one required intermediate dataset.
-  draw_box(11.65, 4.18, 3.25, 0.68,
-           "filter_objects.rds",
+  # Filter branch and its two exporters.
+  draw_box(12.45, 4.48, 4.35, 0.78,
+           "filter_objects.rds\nfilter_objects_summary.csv",
            palette$intermediate, font = 2)
-  draw_box(11.65, 2.92, 3.7, 1.0,
-           "Filter review\nfilter_review.xlsx\nfilter_review_value_lists.csv",
-           palette$final, font = 2)
-  connect(11.65, 5.35, 11.65, 4.18, 0.38, 0.34)
-  connect(11.65, 4.18, 11.65, 2.92, 0.34, 0.50)
-
-  # Supporting detail outputs retained by the full pipeline.
-  draw_box(7, 2.63, 3.55, 0.82,
-           "Detailed technical exports\nsaved_columns.csv\nfilter_criteria.csv",
-           palette$diagnostic)
-  connect(7, 4.05, 7, 2.63, 0.45, 0.41)
-  connect(11.65, 4.18, 8.55, 2.82, 0.34, 0.41)
+  connect(12.45, 5.78, 12.45, 4.48, 0.45, 0.39)
+  draw_box(10.35, 3.15, 4.0, 0.88,
+           "Criteria export\nscripts/extract_scripts/export_filter_criteria.R",
+           palette$process, font = 2, cex = 0.67)
+  draw_box(14.05, 3.15, 3.65, 0.88,
+           "Review export\nscripts/extract_scripts/export_filter_review.R",
+           palette$process, font = 2, cex = 0.67)
+  connect(12.45, 4.48, 10.35, 3.15, 0.39, 0.44)
+  connect(12.45, 4.48, 14.05, 3.15, 0.39, 0.44)
+  draw_box(10.35, 1.88, 3.65, 0.72,
+           "filter_criteria.csv",
+           palette$diagnostic, font = 2)
+  draw_box(14.05, 1.78, 3.65, 1.0,
+           paste(
+             "Filter review outputs",
+             "filter_review.xlsx",
+             "filter_review.csv",
+             "filter_review_value_lists.csv",
+             sep = "\n"
+           ),
+           palette$final, font = 2, cex = 0.72)
+  connect(10.35, 3.15, 10.35, 1.88, 0.44, 0.36)
+  connect(14.05, 3.15, 14.05, 1.78, 0.44, 0.50)
 
   # Legend.
-  legend_y <- 1.25
+  legend_y <- 0.78
   legend_items <- list(
     c("Input", palette$input),
     c("Processing", palette$process),
@@ -143,7 +192,7 @@ describe_run_pipeline <- function(
     c("Review output", palette$final),
     c("Optional / technical", palette$diagnostic)
   )
-  legend_x <- c(2.0, 4.45, 7.0, 9.55, 12.2)
+  legend_x <- c(2.2, 5.0, 8.0, 10.9, 13.7)
   for (i in seq_along(legend_items)) {
     graphics::rect(legend_x[i] - 0.55, legend_y - 0.16,
                    legend_x[i] - 0.20, legend_y + 0.16,
@@ -153,7 +202,7 @@ describe_run_pipeline <- function(
   }
 
   graphics::text(
-    7, 0.65,
+    8, 0.28,
     "Run: Rscript scripts/run_pipeline.R path/to/file.catalog [output_dir]",
     cex = 0.75, col = palette$arrow
   )
