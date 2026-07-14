@@ -6,7 +6,7 @@ setwd(original_working_directory)
 testthat::test_that("the filter fixture runs through the complete filter branch", {
   fixture <- file.path(
     project_root,
-    "tests", "fixtures", "filters_annual_statistics_2025_26.catalog"
+    "data", "filters_annual_statistics_2025_26.catalog"
   )
   output_dir <- tempfile("filter-pipeline-output-")
   dir.create(output_dir)

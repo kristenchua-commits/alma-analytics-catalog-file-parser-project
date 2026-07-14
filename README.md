@@ -133,7 +133,9 @@ live under `docs/images/` and `docs/validation/`.
 
 ## Tests
 
-The small filter-only catalog is maintained as a fixture under `tests/fixtures/`.
+The small filter-only catalog is maintained at
+`data/filters_annual_statistics_2025_26.catalog` and used as the automated test
+fixture.
 Run:
 
 ```sh
@@ -153,8 +155,8 @@ its expected files, and verifies that saved-column outputs are skipped. It uses
 | `R/inspect/` | Metadata inspection |
 | `R/export/` | Review and detailed exports |
 | `scripts/` | Thin command-line, interactive, and diagram-rendering entry points |
-| `data/examples/` | Example `.catalog` input |
-| `tests/fixtures/` | Small catalog fixtures used by automated tests |
+| `data/` | Catalog inputs, including the small filter test fixture |
+| `data/examples/` | Full example `.catalog` input |
 | `docs/notebooks/` | Executable notebook walkthrough |
 | `docs/images/` | Generated pipeline documentation diagram |
 | `docs/validation/` | Manual validation evidence |

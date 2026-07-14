@@ -4,7 +4,7 @@ if (requireNamespace("testthat", quietly = TRUE)) {
   message("Package 'testthat' is unavailable; running the fixture assertions with base R.")
   source("R/run_pipeline.R")
 
-  fixture <- "tests/fixtures/filters_annual_statistics_2025_26.catalog"
+  fixture <- "data/filters_annual_statistics_2025_26.catalog"
   output_dir <- tempfile("filter-pipeline-output-")
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
