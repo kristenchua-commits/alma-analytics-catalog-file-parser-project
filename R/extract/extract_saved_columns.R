@@ -59,11 +59,3 @@ extract_saved_columns <- function(
   message("Wrote ", output_path, " (", nrow(saved_columns), " rows)")
   invisible(saved_columns)
 }
-
-if (sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  extract_saved_columns(
-    if (length(args)) args[1L] else "output/catalog_extract.rds",
-    if (length(args) > 1L) args[2L] else "output/saved_columns.csv"
-  )
-}

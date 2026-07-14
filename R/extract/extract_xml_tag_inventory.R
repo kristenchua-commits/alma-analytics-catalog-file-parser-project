@@ -49,11 +49,3 @@ extract_xml_tag_inventory <- function(
   message("Wrote ", output_path, " (", nrow(inventory), " tags)")
   invisible(inventory)
 }
-
-if (sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  extract_xml_tag_inventory(
-    if (length(args)) args[1L] else "output/catalog_extract.rds",
-    if (length(args) > 1L) args[2L] else "output/xml_tag_inventory.csv"
-  )
-}

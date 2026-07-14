@@ -63,11 +63,3 @@ export_filter_criteria <- function(
   message("Wrote ", output_path, " (", nrow(criteria), " criteria rows)")
   invisible(criteria)
 }
-
-if (sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  export_filter_criteria(
-    if (length(args)) args[1L] else "output/filter_objects.rds",
-    if (length(args) > 1L) args[2L] else "output/filter_criteria.csv"
-  )
-}

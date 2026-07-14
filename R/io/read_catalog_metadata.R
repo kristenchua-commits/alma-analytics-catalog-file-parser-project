@@ -2,7 +2,7 @@
 read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
   if (is.character(catalog) && length(catalog) == 1L) {
     if (!exists("read_catalog_file", mode = "function")) {
-      source("scripts/script_helper_functions/read_catalog_file.R")
+      source("R/io/read_catalog_file.R")
     }
     catalog <- read_catalog_file(catalog, keep_strings = TRUE)
   }

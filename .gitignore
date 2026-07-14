@@ -4,5 +4,6 @@
 .Ruserdata
 .positai
 .DS_Store
-output/*.rds
-output/*.csv
+output/
+*.html
+*_files/

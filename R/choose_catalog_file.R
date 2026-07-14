@@ -1,5 +1,5 @@
 # Interactive wrapper for selecting a .catalog file and running the pipeline.
-source("scripts/run_pipeline.R")
+if (!exists("run_pipeline", mode = "function")) source("R/run_pipeline.R")
 
 find_catalog_files <- function(
     search_directories = c("data", path.expand("~/Downloads"))) {
@@ -75,22 +75,4 @@ run_catalog_pipeline <- function(catalog_path = NULL, output_dir = "output") {
   catalog_path <- normalizePath(catalog_path, mustWork = TRUE)
   message("Selected catalog: ", catalog_path)
   run_pipeline(catalog_path = catalog_path, output_dir = output_dir)
-}
-
-# In RStudio, run:
-# source("choose_catalog_file_and_run_pipeline.R")
-# catalog <- run_catalog_pipeline()
-
-if (!interactive() && sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  if (!length(args)) {
-    stop(paste(
-      "Usage: Rscript choose_catalog_file_and_run_pipeline.R",
-      "path/to/file.catalog [output_dir]"
-    ))
-  }
-  run_catalog_pipeline(
-    catalog_path = args[1L],
-    output_dir = if (length(args) > 1L) args[2L] else "output"
-  )
 }

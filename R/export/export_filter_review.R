@@ -179,11 +179,3 @@ export_filter_review <- function(
   message("Wrote ", values_csv, " (", nrow(value_lists), " list values)")
   invisible(list(review = review, value_lists = value_lists, object_index = object_index))
 }
-
-if (!interactive() && sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  export_filter_review(
-    if (length(args)) args[1L] else "output/filter_objects.rds",
-    if (length(args) > 1L) args[2L] else "output/filter_review.xlsx"
-  )
-}

@@ -28,12 +28,3 @@ extract_filter_objects <- function(
   message("Wrote ", output_csv)
   invisible(filter_objects)
 }
-
-if (sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  extract_filter_objects(
-    if (length(args)) args[1L] else "output/catalog_extract.rds",
-    if (length(args) > 1L) args[2L] else "output/filter_objects.rds",
-    if (length(args) > 2L) args[3L] else "output/filter_objects_summary.csv"
-  )
-}

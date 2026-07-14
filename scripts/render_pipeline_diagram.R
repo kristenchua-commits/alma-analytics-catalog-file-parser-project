@@ -1,13 +1,10 @@
 # Create a flow diagram of the Alma Analytics .catalog parsing pipeline.
 
-describe_run_pipeline <- function(
-    output_path = "output/run_pipeline_diagram.png",
+render_pipeline_diagram <- function(
+    output_path = "docs/images/run_pipeline_diagram.png",
     width = 16,
     height = 12) {
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
-  
-  #Marri is so cool
-
   extension <- tolower(tools::file_ext(output_path))
   if (extension == "png") {
     grDevices::png(output_path, width = width, height = height,
@@ -82,54 +79,59 @@ describe_run_pipeline <- function(
   )
 
   # Entry points and input.
-  draw_box(4.4, 10.65, 4.5, 0.72,
-           "Optional interactive entry point\nchoose_catalog_file_and_run_pipeline.R",
-           palette$process, font = 2, cex = 0.72)
+  draw_box(4.4, 10.65, 4.5, 0.88,
+           paste(
+             "Optional interactive entry point",
+             "scripts/choose_catalog_file_and_run_pipeline.R",
+             "R/choose_catalog_file.R",
+             sep = "\n"
+           ),
+           palette$process, font = 2, cex = 0.65)
   draw_box(11.6, 10.65, 3.8, 0.72, "Raw Alma Analytics .catalog file",
            palette$input, font = 2, cex = 0.88)
-  draw_box(8, 9.55, 4.4, 0.72,
-           "Pipeline orchestrator\nscripts/run_pipeline.R",
-           palette$process, font = 2, cex = 0.78)
-  connect(4.4, 10.65, 8, 9.55, 0.36, 0.36)
-  connect(11.6, 10.65, 8, 9.55, 0.36, 0.36)
+  draw_box(8, 9.55, 4.4, 0.88,
+           "Pipeline orchestrator\nscripts/run_pipeline.R\nR/run_pipeline.R",
+           palette$process, font = 2, cex = 0.68)
+  connect(4.4, 10.65, 8, 9.55, 0.44, 0.44)
+  connect(11.6, 10.65, 8, 9.55, 0.36, 0.44)
 
   # Shared extraction stage and its helper scripts.
   draw_box(8, 8.35, 7.4, 0.95,
            paste(
              "Extract XML objects + align catalog metadata",
-             "scripts/extract_scripts/extract_XMLFileList.R",
-             "scripts/script_helper_functions/read_catalog_file.R",
-             "scripts/script_helper_functions/read_catalog_metadata.R",
+             "R/extract/extract_catalog.R",
+             "R/io/read_catalog_file.R",
+             "R/io/read_catalog_metadata.R",
              sep = "\n"
            ),
            palette$process, font = 2, cex = 0.64)
   draw_box(8, 7.05, 4.5, 0.78,
            "catalog_extract.rds\ncatalog_extract_summary.csv",
            palette$intermediate, font = 2)
-  connect(8, 9.55, 8, 8.35, 0.36, 0.48)
+  connect(8, 9.55, 8, 8.35, 0.44, 0.48)
   connect(8, 8.35, 8, 7.05, 0.48, 0.39)
 
   # Three downstream branches.
   draw_box(2.45, 5.65, 4.25, 1.15,
            paste(
              "Inspection and tag inventory",
-             "scripts/inventory/inspect_catalog_metadata.R",
-             "scripts/extract_scripts/extract_XMLTagInventory.r",
+             "R/inspect/inspect_catalog_metadata.R",
+             "R/extract/extract_xml_tag_inventory.R",
              sep = "\n"
            ),
            palette$diagnostic, font = 2, cex = 0.66)
   draw_box(7.15, 5.65, 4.25, 1.15,
            paste(
              "Saved-column parsing and review",
-             "scripts/extract_scripts/extract_SavedColumn.R",
-             "scripts/extract_scripts/export_saved_column_review.R",
+             "R/extract/extract_saved_columns.R",
+             "R/export/export_saved_column_review.R",
              sep = "\n"
            ),
            palette$process, font = 2, cex = 0.66)
   draw_box(12.45, 5.78, 5.0, 0.9,
            paste(
              "Filter-object selection",
-             "scripts/extract_scripts/extract_XML_to_FilterObject.r",
+             "R/extract/extract_filter_objects.R",
              sep = "\n"
            ),
            palette$process, font = 2, cex = 0.69)
@@ -161,10 +163,10 @@ describe_run_pipeline <- function(
            palette$intermediate, font = 2)
   connect(12.45, 5.78, 12.45, 4.48, 0.45, 0.39)
   draw_box(10.35, 3.15, 4.0, 0.88,
-           "Criteria export\nscripts/extract_scripts/export_filter_criteria.R",
+           "Criteria export\nR/export/export_filter_criteria.R",
            palette$process, font = 2, cex = 0.67)
   draw_box(14.05, 3.15, 3.65, 0.88,
-           "Review export\nscripts/extract_scripts/export_filter_review.R",
+           "Review export\nR/export/export_filter_review.R",
            palette$process, font = 2, cex = 0.67)
   connect(12.45, 4.48, 10.35, 3.15, 0.39, 0.44)
   connect(12.45, 4.48, 14.05, 3.15, 0.39, 0.44)
@@ -212,7 +214,7 @@ describe_run_pipeline <- function(
 
 if (!interactive() && sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
-  output_path <- if (length(args)) args[1L] else "output/run_pipeline_diagram.png"
-  diagram_path <- describe_run_pipeline(output_path)
+  output_path <- if (length(args)) args[1L] else "docs/images/run_pipeline_diagram.png"
+  diagram_path <- render_pipeline_diagram(output_path)
   message("Wrote ", diagram_path)
 }

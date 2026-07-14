@@ -36,11 +36,3 @@ inspect_catalog_metadata <- function(
   message("Wrote ", output_path, " (", nrow(inventory), " patterns)")
   invisible(inventory)
 }
-
-if (sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  inspect_catalog_metadata(
-    if (length(args)) args[1L] else "output/catalog_extract.rds",
-    if (length(args) > 1L) args[2L] else "output/catalog_metadata_inventory.csv"
-  )
-}

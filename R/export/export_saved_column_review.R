@@ -141,11 +141,3 @@ export_saved_column_review <- function(
   message("Wrote ", output_xlsx, " (", nrow(review), " review rows)")
   invisible(list(review = review, object_index = object_index))
 }
-
-if (!interactive() && sys.nframe() == 0L) {
-  args <- commandArgs(trailingOnly = TRUE)
-  export_saved_column_review(
-    if (length(args)) args[1L] else "output/catalog_extract.rds",
-    if (length(args) > 1L) args[2L] else "output/saved_column_review.xlsx"
-  )
-}
