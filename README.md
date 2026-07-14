@@ -127,9 +127,9 @@ the corresponding object type is absent.
 | `filter_review.csv` | CSV version of the primary filter-review rows |
 | `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
 
-Generated files under `output/` are ignored by Git and can be deleted safely.
-Selected committed examples live under `examples/output/`; documentation images
-live under `docs/images/` and `docs/validation/`.
+All generated pipeline files are written directly under `output/`. The pipeline
+recreates that directory when necessary. Documentation images live separately
+under `docs/images/` and `docs/validation/`.
 
 ## Tests
 
@@ -160,5 +160,4 @@ its expected files, and verifies that saved-column outputs are skipped. It uses
 | `docs/notebooks/` | Executable notebook walkthrough |
 | `docs/images/` | Generated pipeline documentation diagram |
 | `docs/validation/` | Manual validation evidence |
-| `examples/output/` | Deliberately committed representative outputs |
-| `output/` | Disposable generated output, ignored by Git |
+| `output/` | Generated filter, saved-column, inventory, and catalog outputs |

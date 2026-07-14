@@ -1,8 +1,22 @@
 # Extract one metadata row for every XML object returned by read_catalog_file().
+read_catalog_metadata_source_file <- tryCatch(
+  normalizePath(sys.frame(1)$ofile, mustWork = TRUE),
+  error = function(e) NA_character_
+)
+read_catalog_metadata_directory <- if (is.na(read_catalog_metadata_source_file)) {
+  file.path(getwd(), "R", "io")
+} else {
+  dirname(read_catalog_metadata_source_file)
+}
+
 read_catalog_metadata <- function(catalog, keep_strings = FALSE) {
   if (is.character(catalog) && length(catalog) == 1L) {
     if (!exists("read_catalog_file", mode = "function")) {
-      source("R/io/read_catalog_file.R")
+      reader_path <- file.path(read_catalog_metadata_directory, "read_catalog_file.R")
+      if (!file.exists(reader_path)) {
+        stop("Source R/io/read_catalog_file.R before calling read_catalog_metadata().")
+      }
+      source(reader_path)
     }
     catalog <- read_catalog_file(catalog, keep_strings = TRUE)
   }

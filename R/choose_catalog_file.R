@@ -1,8 +1,27 @@
 # Interactive wrapper for selecting a .catalog file and running the pipeline.
-if (!exists("run_pipeline", mode = "function")) source("R/run_pipeline.R")
+catalog_selector_source_file <- tryCatch(
+  normalizePath(sys.frame(1)$ofile, mustWork = TRUE),
+  error = function(e) NA_character_
+)
+if (is.na(catalog_selector_source_file)) {
+  candidates <- c(
+    file.path(getwd(), "R", "choose_catalog_file.R"),
+    file.path(getwd(), "choose_catalog_file.R")
+  )
+  candidates <- candidates[file.exists(candidates)]
+  if (!length(candidates)) stop("Could not determine the project root for catalog selection.")
+  catalog_selector_source_file <- normalizePath(candidates[1L], mustWork = TRUE)
+}
+catalog_project_root <- dirname(dirname(catalog_selector_source_file))
+if (!exists("run_pipeline", mode = "function")) {
+  source(file.path(catalog_project_root, "R", "run_pipeline.R"))
+}
 
 find_catalog_files <- function(
-    search_directories = c("data", path.expand("~/Downloads"))) {
+    search_directories = c(
+      file.path(catalog_project_root, "data"),
+      path.expand("~/Downloads")
+    )) {
   existing_directories <- search_directories[dir.exists(search_directories)]
   if (!length(existing_directories)) return(character(0))
 
@@ -20,7 +39,7 @@ find_catalog_files <- function(
 }
 
 catalog_file_label <- function(path) {
-  repository_root <- normalizePath(getwd(), mustWork = TRUE)
+  repository_root <- catalog_project_root
   downloads_root <- normalizePath(path.expand("~/Downloads"), mustWork = FALSE)
   normalized_path <- normalizePath(path, mustWork = TRUE)
 
@@ -62,7 +81,9 @@ choose_catalog_file <- function() {
   normalizePath(selected_file, mustWork = TRUE)
 }
 
-run_catalog_pipeline <- function(catalog_path = NULL, output_dir = "output") {
+run_catalog_pipeline <- function(
+    catalog_path = NULL,
+    output_dir = file.path(catalog_project_root, "output")) {
   if (is.null(catalog_path)) catalog_path <- choose_catalog_file()
 
   if (!file.exists(catalog_path)) {
