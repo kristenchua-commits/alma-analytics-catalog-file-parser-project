@@ -128,12 +128,22 @@ export_saved_column_review <- function(
 
   review <- do.call(rbind, review_rows)
   object_index <- do.call(rbind, object_rows)
-  review_sheet <- review[c(
-    "saved_column_name", "bin_criterion", "bin_label", "explanation",
-    "base_formula", "rule_id"
-  )]
+  review_output <- data.frame(
+    rule_name = review$saved_column_name,
+    criterion_text = review$bin_criterion,
+    review_label = review$bin_label,
+    explanation = review$explanation,
+    criterion_text_category = review$base_formula,
+    rule_id = review$rule_id,
+    rule_type = rep("Saved Column", nrow(review)),
+    source_workbook = rep("Saved Column Review", nrow(review)),
+    join_operator = rep(NA_character_, nrow(review)),
+    value_count = rep(NA_integer_, nrow(review)),
+    stringsAsFactors = FALSE
+  )
+  review_sheet <- review_output
   dir.create(dirname(output_xlsx), recursive = TRUE, showWarnings = FALSE)
-  write.csv(review, output_csv, row.names = FALSE, na = "")
+  write.csv(review_output, output_csv, row.names = FALSE, na = "")
   writexl::write_xlsx(
     list("Saved Column Review" = review_sheet, "Object Index" = object_index),
     output_xlsx

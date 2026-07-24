@@ -149,12 +149,22 @@ export_filter_review <- function(
   names(object_index)[names(object_index) == "object_title"] <- "filter_name"
 
   dir.create(dirname(output_xlsx), recursive = TRUE, showWarnings = FALSE)
-  write.csv(review, review_csv, row.names = FALSE, na = "")
+  review_output <- data.frame(
+    rule_name = review$filter_name,
+    criterion_text = review$filter_criterion,
+    review_label = review$review_label,
+    explanation = review$explanation,
+    criterion_text_category = rep(NA_character_, nrow(review)),
+    rule_id = review$criterion_id,
+    rule_type = rep("Filter", nrow(review)),
+    source_workbook = rep("Filter Review", nrow(review)),
+    join_operator = review$join_operator,
+    value_count = review$value_count,
+    stringsAsFactors = FALSE
+  )
+  write.csv(review_output, review_csv, row.names = FALSE, na = "")
   write.csv(value_lists, values_csv, row.names = FALSE, na = "")
-  review_sheet <- review[c(
-    "filter_name", "criterion_id", "join_operator", "filter_criterion",
-    "value_count", "review_label", "explanation"
-  )]
+  review_sheet <- review_output
   value_list_summary <- if (nrow(value_lists)) {
     groups <- split(value_lists, value_lists$criterion_id)
     do.call(rbind, lapply(groups, function(group) data.frame(
