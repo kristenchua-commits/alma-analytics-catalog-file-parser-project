@@ -74,7 +74,7 @@ render_pipeline_diagram <- function(
   )
   graphics::text(
     8, 11.38,
-    "Complete script, input, intermediate dataset, and output map",
+    "Automated parser scripts, inputs, intermediate datasets, and outputs",
     cex = 0.82, col = palette$arrow
   )
 

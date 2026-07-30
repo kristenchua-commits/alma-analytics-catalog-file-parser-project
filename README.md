@@ -4,18 +4,32 @@ R utilities for extracting and reviewing objects embedded in Ex Libris Alma
 Analytics `.catalog` files. The pipeline preserves full XML in RDS files and
 writes spreadsheet-friendly CSV files without the large `xml_text` column.
 
-For a GitHub-rendered notebook walkthrough with annotations, R code cells, and
-saved example outputs, open
-[`docs/notebooks/alma_analytics_catalog_file_parser.ipynb`](docs/notebooks/alma_analytics_catalog_file_parser.ipynb).
+## Notebooks
+
+- [`docs/notebooks/alma_analytics_catalog_file_parser.ipynb`](docs/notebooks/alma_analytics_catalog_file_parser.ipynb)
+  is the main GitHub-rendered walkthrough of the parser, method selection,
+  verified example, and downstream documentation workflow.
+- [`docs/notebooks/catalog_file_xml_structure.ipynb`](docs/notebooks/catalog_file_xml_structure.ipynb)
+  is a collapsible view of the XML tag hierarchy in the current example
+  `.catalog` file. Its R cell regenerates the tree from current pipeline
+  outputs.
 
 ## Requirements
 
 - R 4.1 or newer
-- The R packages `xml2` and `writexl`
+- Core parser: the R packages `xml2` and `writexl`
+- Campus exclusions-documentation export: `readxl` and `openxlsx2`
+- Optional notebook execution: an R Jupyter kernel and `IRdisplay`
+- Optional test runner: `testthat`; equivalent base-R assertions run when it is
+  unavailable
 
-Install the packages once with `install.packages(c("xml2", "writexl"))`.
+Install the packages needed for both documented workflows with:
 
-## Run the complete pipeline
+```r
+install.packages(c("xml2", "writexl", "readxl", "openxlsx2"))
+```
+
+## Run the automated parser pipeline
 
 From the repository root:
 
@@ -33,14 +47,16 @@ source("scripts/choose_catalog_file_and_run_pipeline.R")
 catalog <- run_catalog_pipeline()
 ```
 
-## Pipeline map
+## Parser pipeline map
 
 ![Alma Analytics catalog parser pipeline showing every processing script, input, intermediate dataset, and output](docs/images/run_pipeline_diagram.png)
 
-The arrows show the direction of processing. Blue identifies the original
-input, green identifies processing scripts, yellow identifies intermediate
-datasets, purple identifies human-facing review outputs, and gray identifies
-inspection or detailed technical outputs.
+The diagram covers the automated `.catalog` parser. The arrows show the
+direction of processing. Blue identifies the original input, green identifies
+processing scripts, yellow identifies intermediate datasets, purple identifies
+human-facing review outputs, and gray identifies inspection or detailed
+technical outputs. The separately reviewed publication workflow is documented
+below.
 
 `scripts/choose_catalog_file_and_run_pipeline.R` is an optional interactive
 entry point. It selects a `.catalog` file and passes it to
@@ -57,6 +73,8 @@ are intentionally thin entry points.
 | Filter-object selection | `R/extract/extract_filter_objects.R` | Filter rows in `catalog_extract.rds` | `filter_objects.rds`; `filter_objects_summary.csv` |
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
 | Filter review | `R/export/export_filter_review.R` | `filter_objects.rds` | `filter_review.xlsx`; `filter_review.csv`; `filter_review_value_lists.csv` |
+| Reviewed normalization | Manual review in `output/normalized_combined_saved_column_and_filter_review.xlsx` | Saved-column and filter review rows | Campus, domain, labels, explanations, and campus worksheets |
+| Campus documentation publication | `scripts/export_exclusions_documentation.R` | Reviewed normalized workbook | One exclusions-documentation workbook per `UC*` worksheet |
 
 ### Shared extraction
 
@@ -109,6 +127,39 @@ large `IN`/`NOT IN` lists in a companion CSV.
 The saved-column and filter branches are conditional: a branch is skipped when
 the corresponding object type is absent.
 
+### Reviewed publication workflow
+
+`run_pipeline()` ends after creating the saved-column and filter review files.
+It does not create the normalized combined workbook automatically.
+
+`output/normalized_combined_saved_column_and_filter_review.xlsx` is a reviewed
+input to the publication step. It combines filter and saved-column rules and
+adds human-maintained fields, including:
+
+- Electronic, Physical, or Fulfillment domain
+- campus or global scope
+- review labels and explanations
+- campus-specific rule selection
+
+After that review is complete, generate the campus workbooks with:
+
+```sh
+Rscript scripts/export_exclusions_documentation.R \
+  output/normalized_combined_saved_column_and_filter_review.xlsx \
+  output/exclusions_documentation
+```
+
+The script processes worksheets whose names begin with `UC`. It requires these
+columns:
+
+`rule_type`, `source_workbook`, `Electronic/Physical/Fulfillment`, `Campus`,
+`rule_name`, `rule_id`, `join_operator`, `criterion_text`, `value_count`,
+`review_label`, `explanation`, and `criterion_text_category`.
+
+The fiscal-year label and output filename pattern are currently configured in
+`scripts/export_exclusions_documentation.R` for FY 2025–26. Update that
+configuration before using the script for a new annual cycle.
+
 ## Outputs
 
 | File | Purpose |
@@ -118,18 +169,32 @@ the corresponding object type is absent.
 | `catalog_metadata_inventory.csv` | Counts and missing-field checks by object pattern |
 | `xml_tag_inventory.csv` | XML tags, paths, depths, attributes, and values |
 | `saved_columns.csv` | Parsed saved-column definitions |
-| `saved_column_review.xlsx` | Readable bin criteria, labels, and explanation fields |
-| `saved_column_review.csv` | CSV version of the saved-column review rows and rule IDs |
+| `saved_column_review.xlsx` | Saved-column business rules in the shared review schema, plus an object index |
+| `saved_column_review.csv` | CSV version of the saved-column rules in the shared review schema |
 | `filter_objects.rds` | Full filter objects including XML |
 | `filter_objects_summary.csv` | Spreadsheet-friendly filter object metadata |
 | `filter_criteria.csv` | Flattened filter expressions and criteria |
-| `filter_review.xlsx` | Concise documentation workbook with one row per business rule |
-| `filter_review.csv` | CSV version of the primary filter-review rows |
+| `filter_review.xlsx` | Filter business rules in the shared review schema, plus value-list and object-index sheets |
+| `filter_review.csv` | CSV version of the filter rules in the shared review schema |
 | `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
+| `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_pipeline()` |
+| `exclusions_documentation/*.xlsx` | Campus-specific documentation created by the separate publication script |
 
-All generated pipeline files are written directly under `output/`. The pipeline
-recreates that directory when necessary. Documentation images live separately
+Automated parser files are written directly under `output/`. The pipeline
+creates that directory when necessary but does not delete unrelated or
+downstream files already stored there. Documentation images live separately
 under `docs/images/` and `docs/validation/`.
+
+The current exporters use the same ten-column rule schema for
+`saved_column_review.csv` and `filter_review.csv`:
+
+`rule_name`, `criterion_text`, `review_label`, `explanation`,
+`criterion_text_category`, `rule_id`, `rule_type`, `source_workbook`,
+`join_operator`, and `value_count`.
+
+Some checked-in output files are retained as project snapshots and can predate
+the current exporter schema. Run the parser into a new output directory when
+you need outputs guaranteed to match the current code.
 
 ## Tests
 
@@ -145,6 +210,8 @@ Rscript tests/testthat.R
 The test executes the complete filter branch in a temporary directory, checks
 its expected files, and verifies that saved-column outputs are skipped. It uses
 `testthat` when installed and otherwise runs equivalent assertions with base R.
+It does not currently test saved-column rule content, the manually normalized
+workbook, or the campus exclusions-documentation exporter.
 
 ## Repository layout
 
@@ -154,10 +221,10 @@ its expected files, and verifies that saved-column outputs are skipped. It uses
 | `R/extract/` | Catalog, saved-column, filter-object, and XML-tag extraction |
 | `R/inspect/` | Metadata inspection |
 | `R/export/` | Review and detailed exports |
-| `scripts/` | Thin command-line, interactive, and diagram-rendering entry points |
+| `scripts/` | Command-line and interactive parser entry points, diagram rendering, and campus documentation publication |
 | `data/` | Catalog inputs, including the small filter test fixture |
 | `data/examples/` | Full example `.catalog` input |
-| `docs/notebooks/` | Executable notebook walkthrough |
+| `docs/notebooks/` | Main parser walkthrough and collapsible XML-structure notebook |
 | `docs/images/` | Generated pipeline documentation diagram |
 | `docs/validation/` | Manual validation evidence |
-| `output/` | Generated filter, saved-column, inventory, and catalog outputs |
+| `output/` | Parser outputs, reviewed normalized workbook, and campus documentation snapshots |
