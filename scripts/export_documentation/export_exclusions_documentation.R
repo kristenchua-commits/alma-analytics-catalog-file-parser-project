@@ -4,12 +4,15 @@
 # campus-specific "Exclusions documentation" workbook.
 #
 # Usage:
-#   Rscript scripts/export_exclusions_documentation.R [input.xlsx] [output_dir]
+#   Rscript scripts/export_documentation/export_exclusions_documentation.R \
+#     [input.xlsx] [output_dir] [catalog_file]
 #
 # Defaults:
 #   input.xlsx:  normalized_combined_saved_column_and_filter_review_data.xlsx
 #                (with fallbacks for the repository's current output name)
-#   output_dir:  output/exclusions_documentation
+#   output_dir:  output/Campus FY 2025-26 annual statistics NZ-level output/
+#                2025/2026
+#   catalog_file: data/examples/annual_stats_fy_2025_2026.catalog
 
 required_packages <- c("readxl", "openxlsx2")
 missing_packages <- required_packages[
@@ -42,15 +45,62 @@ if (is.na(input_path)) {
   )
 }
 
-output_dir <- if (length(args) >= 2L) {
-  args[[2L]]
-} else {
-  file.path("output", "exclusions_documentation")
+catalog_candidates <- unique(c(
+  if (length(args) >= 3L) args[[3L]] else character(),
+  file.path("data", "examples", "annual_stats_fy_2025_2026.catalog")
+))
+
+catalog_path <- catalog_candidates[file.exists(catalog_candidates)][1L]
+if (is.na(catalog_path)) {
+  stop(
+    "Could not find the source .catalog file used to set the as-of date. Checked: ",
+    paste(catalog_candidates, collapse = ", "),
+    call. = FALSE
+  )
 }
-dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+catalog_creation_date <- function(path) {
+  if (identical(Sys.info()[["sysname"]], "Darwin")) {
+    birth_date <- suppressWarnings(system2(
+      "stat",
+      c("-f", "%SB", "-t", "%Y-%m-%d", shQuote(path)),
+      stdout = TRUE,
+      stderr = FALSE
+    ))
+    if (length(birth_date) > 0L && grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", birth_date[[1L]])) {
+      return(birth_date[[1L]])
+    }
+  }
+
+  modified_time <- file.info(path)$mtime[[1L]]
+  if (is.na(modified_time)) {
+    stop("Could not determine a date for the source .catalog file: ", path)
+  }
+  warning(
+    "File creation time is unavailable; using the .catalog modification date instead.",
+    call. = FALSE
+  )
+  format(as.Date(modified_time), "%Y-%m-%d")
+}
+
+catalog_as_of_date <- catalog_creation_date(catalog_path)
 
 fiscal_year <- "FY 2025-26"
 fiscal_year_filename <- gsub("[[:space:]]+", "", fiscal_year)
+default_output_dir <- file.path(
+  "output",
+  paste("Campus", fiscal_year, "annual statistics NZ-level output"),
+  "2025",
+  "2026"
+)
+
+output_dir <- if (length(args) >= 2L) {
+  args[[2L]]
+} else {
+  default_output_dir
+}
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
 documentation_sheet <- "Exclusions documentation"
 
 expected_columns <- c(
@@ -441,7 +491,7 @@ for (campus in campus_sheets) {
   campus_code <- if (grepl("^UC", campus)) campus else paste0("UC", campus)
   output_name <- paste0(
     campus_code, "_targeted_review_", fiscal_year_filename,
-    "_exclusions_documentation.xlsx"
+    "_exclusions_documentation_as_of_", catalog_as_of_date, ".xlsx"
   )
   output_file <- file.path(output_dir, sanitize_filename(output_name))
   write_campus_workbook(data, campus_code, output_file)

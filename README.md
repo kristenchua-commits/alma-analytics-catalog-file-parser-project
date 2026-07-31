@@ -77,7 +77,7 @@ are intentionally thin entry points.
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
 | Filter review | `R/export/export_filter_review.R` | `filter_objects.rds` | `filter_review.xlsx`; `filter_review.csv`; `filter_review_value_lists.csv` |
 | Reviewed normalization | Manual review in `output/normalized_combined_saved_column_and_filter_review.xlsx` | Saved-column and filter review rows | Campus, domain, labels, explanations, and campus worksheets |
-| Campus documentation publication | `scripts/export_exclusions_documentation.R` | Reviewed normalized workbook | One exclusions-documentation workbook per `UC*` worksheet |
+| Campus documentation publication | `scripts/export_documentation/export_exclusions_documentation.R` | Reviewed normalized workbook and source `.catalog` file | One exclusions-documentation workbook per `UC*` worksheet |
 
 ### Shared extraction
 
@@ -147,10 +147,17 @@ adds human-maintained fields, including:
 After that review is complete, generate the campus workbooks with:
 
 ```sh
-Rscript scripts/export_exclusions_documentation.R \
-  output/normalized_combined_saved_column_and_filter_review.xlsx \
-  output/exclusions_documentation
+Rscript scripts/export_documentation/export_exclusions_documentation.R \
+  output/normalized_combined_saved_column_and_filter_review.xlsx
 ```
+
+By default, the generated campus workbooks are written under:
+
+- `output/Campus FY 2025-26 annual statistics NZ-level output/2025/2026/`
+
+Because `/` separates path components, the annual-statistics destination uses
+nested `2025/2026` directories. Pass a second command-line argument to override
+this default output directory.
 
 The script processes worksheets whose names begin with `UC`. It requires these
 columns:
@@ -160,13 +167,17 @@ columns:
 `review_label`, `explanation`, and `criterion_text_category`.
 
 The fiscal-year label and output filename pattern are currently configured in
-`scripts/export_exclusions_documentation.R` for FY 2025–26. Update that
+`scripts/export_documentation/export_exclusions_documentation.R` for FY 2025–26. Update that
 configuration before using the script for a new annual cycle.
+
+The exporter reads the source `.catalog` file's creation date and adds it to
+each filename in ISO `YYYY-MM-DD` format. The current source archive was created
+on July 9, 2026.
 
 Campus documentation filenames use this pattern:
 
-- `UCB_targeted_review_FY2025-26_exclusions_documentation.xlsx`
-- `UCD_targeted_review_FY2025-26_exclusions_documentation.xlsx`
+- `UCB_targeted_review_FY2025-26_exclusions_documentation_as_of_2026-07-09.xlsx`
+- `UCD_targeted_review_FY2025-26_exclusions_documentation_as_of_2026-07-09.xlsx`
 - one corresponding workbook for every other normalized-workbook sheet whose
   name begins with `UC`
 
@@ -188,7 +199,7 @@ Campus documentation filenames use this pattern:
 | `filter_review.csv` | CSV version of the filter rules in the shared review schema |
 | `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
 | `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_pipeline()` |
-| `exclusions_documentation/*.xlsx` | Campus-specific documentation created by the separate publication script |
+| `Campus FY 2025-26 annual statistics NZ-level output/2025/2026/*.xlsx` | Campus-specific documentation created by the separate publication script |
 
 Automated parser files are written directly under `output/`. The pipeline
 creates that directory when necessary but does not delete unrelated or
