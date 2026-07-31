@@ -90,7 +90,7 @@ render_pipeline_diagram <- function(
   draw_box(11.6, 10.65, 3.8, 0.72, "Raw Alma Analytics .catalog file",
            palette$input, font = 2, cex = 0.88)
   draw_box(8, 9.55, 4.4, 0.88,
-           "Pipeline orchestrator\nscripts/run_pipeline.R\nR/run_pipeline.R",
+           "Pipeline orchestrator\nscripts/run_parsing_pipeline.R\nR/run_pipeline.R",
            palette$process, font = 2, cex = 0.68)
   connect(4.4, 10.65, 8, 9.55, 0.44, 0.44)
   connect(11.6, 10.65, 8, 9.55, 0.36, 0.44)
@@ -205,7 +205,7 @@ render_pipeline_diagram <- function(
 
   graphics::text(
     8, 0.28,
-    "Run: Rscript scripts/run_pipeline.R path/to/file.catalog [output_dir]",
+    "Run: Rscript scripts/run_parsing_pipeline.R path/to/file.catalog [output_dir]",
     cex = 0.75, col = palette$arrow
   )
 

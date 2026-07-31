@@ -8,5 +8,5 @@ dashboard, and dashboard-page objects retained by the shared catalog extract.
 Run it from the repository root with:
 
 ```sh
-Rscript scripts/run_pipeline.R data/examples/annual_stats_fy_2025_2026.catalog
+Rscript scripts/run_parsing_pipeline.R data/examples/annual_stats_fy_2025_2026.catalog
 ```

@@ -37,7 +37,7 @@ install.packages(c("xml2", "writexl", "readxl", "openxlsx2"))
 From the repository root:
 
 ```sh
-Rscript scripts/run_pipeline.R "data/examples/annual_stats_fy_2025_2026.catalog"
+Rscript scripts/run_parsing_pipeline.R "data/examples/annual_stats_fy_2025_2026.catalog"
 ```
 
 ### Choose a file interactively in RStudio
@@ -63,13 +63,13 @@ below.
 
 `scripts/choose_catalog_file_and_run_pipeline.R` is an optional interactive
 entry point. It selects a `.catalog` file and passes it to
-`scripts/run_pipeline.R`, the command-line entry point for the orchestrator in
+`scripts/run_parsing_pipeline.R`, the command-line entry point for the orchestrator in
 `R/run_pipeline.R`. Reusable functions live under `R/`; scripts under `scripts/`
 are intentionally thin entry points.
 
 | Stage | Script(s) | Reads | Writes |
 | --- | --- | --- | --- |
-| Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_pipeline.R`; `R/choose_catalog_file.R`; `R/run_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
+| Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_parsing_pipeline.R`; `R/choose_catalog_file.R`; `R/run_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
 | Shared catalog extraction | `R/extract/extract_catalog.R`; `R/io/read_catalog_file.R`; `R/io/read_catalog_metadata.R` | `.catalog` file | `catalog_extract.rds`; `catalog_extract_summary.csv` |
 | Metadata and XML-tag inspection | `R/inspect/inspect_catalog_metadata.R`; `R/extract/extract_xml_tag_inventory.R` | `catalog_extract.rds` | `catalog_metadata_inventory.csv`; `xml_tag_inventory.csv` |
 | Saved-column parsing and review | `R/extract/extract_saved_columns.R`; `R/export/export_saved_column_review.R` | Saved-column rows in `catalog_extract.rds` | `saved_columns.csv`; `saved_column_review.xlsx`; `saved_column_review.csv` |

@@ -10,7 +10,11 @@ if (is.na(script_source_file)) {
   } else {
     search_directory <- normalizePath(getwd(), mustWork = TRUE)
     repeat {
-      candidate <- file.path(search_directory, "scripts", "run_pipeline.R")
+      candidate <- file.path(
+        search_directory,
+        "scripts",
+        "run_parsing_pipeline.R"
+      )
       if (file.exists(candidate)) {
         script_source_file <- normalizePath(candidate, mustWork = TRUE)
         break
@@ -29,7 +33,10 @@ source(file.path(script_project_root, "R", "run_pipeline.R"))
 if (!interactive() && sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
   if (!length(args)) {
-    stop("Usage: Rscript scripts/run_pipeline.R path/to/file.catalog [output_dir]")
+    stop(paste(
+      "Usage: Rscript scripts/run_parsing_pipeline.R",
+      "path/to/file.catalog [output_dir]"
+    ))
   }
 
   run_pipeline(
