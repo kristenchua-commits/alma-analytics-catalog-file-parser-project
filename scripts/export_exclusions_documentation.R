@@ -102,7 +102,7 @@ append_row <- function(rows, hierarchy, level, source = NULL) {
   blank <- rep("", 11L)
   names(blank) <- c(
     "Domain", "Scope", "Rule Type", "Rule Name", "Rule ID", "Join",
-    "Review Label", "Explanation", "Value Count", "Criterion Category",
+    "Bin Label", "Explanation", "Value Count", "Criterion Category",
     "Source Workbook"
   )
 

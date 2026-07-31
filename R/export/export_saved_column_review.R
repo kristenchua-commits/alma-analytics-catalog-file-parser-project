@@ -40,6 +40,8 @@ export_saved_column_review <- function(
       operator <- xml2::xml_attr(expression, "op")
       operator_label <- if (!is.na(operator) && operator == "notIn") {
         " is not equal to / is not in "
+      } else if (!is.na(operator) && operator == "beginsWith") {
+        " begins with "
       } else {
         " is equal to / is in "
       }
