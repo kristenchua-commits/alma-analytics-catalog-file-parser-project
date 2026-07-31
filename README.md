@@ -7,8 +7,11 @@ writes spreadsheet-friendly CSV files without the large `xml_text` column.
 ## Notebooks
 
 - [`docs/notebooks/alma_analytics_catalog_file_parser.ipynb`](docs/notebooks/alma_analytics_catalog_file_parser.ipynb)
-  is the main GitHub-rendered walkthrough of the parser, method selection,
-  verified example, and downstream documentation workflow.
+  is the main GitHub-rendered walkthrough of the parser, method selection, and
+  verified example.
+- [`docs/notebooks/campus_documentation.ipynb`](docs/notebooks/campus_documentation.ipynb)
+  validates the reviewed normalized workbook, previews campus output names,
+  and publishes the campus exclusions-documentation workbooks.
 - [`docs/notebooks/catalog_file_xml_structure.ipynb`](docs/notebooks/catalog_file_xml_structure.ipynb)
   is a collapsible view of the XML tag hierarchy in the current example
   `.catalog` file. Its R cell regenerates the tree from current pipeline
@@ -160,6 +163,13 @@ The fiscal-year label and output filename pattern are currently configured in
 `scripts/export_exclusions_documentation.R` for FY 2025–26. Update that
 configuration before using the script for a new annual cycle.
 
+Campus documentation filenames use this pattern:
+
+- `UCB_targeted_review_FY2025-26_exclusions_documentation.xlsx`
+- `UCD_targeted_review_FY2025-26_exclusions_documentation.xlsx`
+- one corresponding workbook for every other normalized-workbook sheet whose
+  name begins with `UC`
+
 ## Outputs
 
 | File | Purpose |
@@ -224,7 +234,7 @@ workbook, or the campus exclusions-documentation exporter.
 | `scripts/` | Command-line and interactive parser entry points, diagram rendering, and campus documentation publication |
 | `data/` | Catalog inputs, including the small filter test fixture |
 | `data/examples/` | Full example `.catalog` input |
-| `docs/notebooks/` | Main parser walkthrough and collapsible XML-structure notebook |
+| `docs/notebooks/` | Parser walkthrough, campus-documentation publication, and collapsible XML-structure notebooks |
 | `docs/images/` | Generated pipeline documentation diagram |
 | `docs/validation/` | Manual validation evidence |
 | `output/` | Parser outputs, reviewed normalized workbook, and campus documentation snapshots |

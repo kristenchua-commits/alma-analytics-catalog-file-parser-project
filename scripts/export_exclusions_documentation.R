@@ -50,6 +50,7 @@ output_dir <- if (length(args) >= 2L) {
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 fiscal_year <- "FY 2025-26"
+fiscal_year_filename <- gsub("[[:space:]]+", "", fiscal_year)
 documentation_sheet <- "Exclusions documentation"
 
 expected_columns <- c(
@@ -439,8 +440,8 @@ for (campus in campus_sheets) {
   data <- data[, expected_columns, drop = FALSE]
   campus_code <- if (grepl("^UC", campus)) campus else paste0("UC", campus)
   output_name <- paste0(
-    "DRAFT ", campus_code, " targeted review ", fiscal_year,
-    " - exclusions documentation.xlsx"
+    campus_code, "_targeted_review_", fiscal_year_filename,
+    "_exclusions_documentation.xlsx"
   )
   output_file <- file.path(output_dir, sanitize_filename(output_name))
   write_campus_workbook(data, campus_code, output_file)
