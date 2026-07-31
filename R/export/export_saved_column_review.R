@@ -28,6 +28,28 @@ export_saved_column_review <- function(
     expression_type <- xml2::xml_attr(expression, "type")
     children <- xml2::xml_find_all(expression, "./*[local-name()='expr']")
 
+    # Null checks are stored as structured comparison expressions whose only
+    # text is the field name. Preserve the operator that Alma displays in the
+    # Bins editor instead of silently returning only that field name.
+    if (!is.na(expression_type) && grepl("comparison", expression_type, fixed = TRUE) &&
+        length(children)) {
+      operator <- xml2::xml_attr(expression, "op")
+      parts <- vapply(children, clean_text, character(1))
+      parts <- parts[!is.na(parts) & nzchar(parts)]
+      field <- if (length(parts)) parts[[1L]] else NA_character_
+
+      if (!is.na(field) && !is.na(operator) && operator == "null") {
+        return(paste0(field, " is null"))
+      }
+      if (!is.na(field) && !is.na(operator) && operator == "notNull") {
+        return(paste0(field, " is not null"))
+      }
+      if (!is.na(field) && !is.na(operator) && operator == "equal" &&
+          length(parts) >= 2L) {
+        return(paste0(field, " is equal to ", paste(parts[-1L], collapse = "; ")))
+      }
+    }
+
     # OBIEE list expressions store the field and every allowed value in
     # separate child nodes. xml_text() concatenates them without delimiters,
     # so join the parts explicitly for a readable spreadsheet criterion.
