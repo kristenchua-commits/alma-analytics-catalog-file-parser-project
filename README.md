@@ -9,7 +9,7 @@ writes spreadsheet-friendly CSV files without the large `xml_text` column.
 - [`docs/notebooks/alma_analytics_catalog_file_parser.ipynb`](docs/notebooks/alma_analytics_catalog_file_parser.ipynb)
   is the main GitHub-rendered walkthrough of the parser, method selection, and
   verified example.
-- [`docs/notebooks/campus_documentation.ipynb`](docs/notebooks/campus_documentation.ipynb)
+- [`docs/notebooks/campus_documentation_construction.ipynb`](docs/notebooks/campus_documentation_construction.ipynb)
   validates the reviewed normalized workbook, previews campus output names,
   and publishes the campus exclusions-documentation workbooks.
 - [`docs/notebooks/catalog_file_xml_structure.ipynb`](docs/notebooks/catalog_file_xml_structure.ipynb)
@@ -113,7 +113,8 @@ When the catalog contains `saved_column` objects, the orchestrator runs
 
 The first script creates the detailed saved-column export. The review exporter
 turns formulas and XML `when`, `condition`, `value`, and `otherwise` elements
-into readable criteria, labels, and rule IDs.
+into SQL-formatted criteria, labels, and rule IDs. Alma operators are rendered
+as SQL operators such as `=`, `IN`, `IS NULL`, and `LIKE`.
 
 ### Filter branch
 
@@ -143,6 +144,12 @@ adds human-maintained fields, including:
 - campus or global scope
 - review labels and explanations
 - campus-specific rule selection
+
+Before constructing the campus workbooks, the publication exporter refreshes
+saved-column criterion text from `output/saved_column_review.csv`, matching on
+`rule_name` and `rule_id`. This preserves the normalized workbook's manual
+campus and classification decisions while preventing older parser text from
+reintroducing missing comparison operators.
 
 After that review is complete, generate the campus workbooks with:
 

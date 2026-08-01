@@ -118,6 +118,46 @@ expected_columns <- c(
   "criterion_text_category"
 )
 
+saved_column_review_path <- file.path(dirname(input_path), "saved_column_review.csv")
+if (!file.exists(saved_column_review_path)) {
+  stop(
+    "Could not find the canonical saved-column review used to refresh criteria: ",
+    saved_column_review_path,
+    call. = FALSE
+  )
+}
+
+canonical_saved_columns <- read.csv(
+  saved_column_review_path,
+  stringsAsFactors = FALSE,
+  check.names = FALSE,
+  na.strings = character()
+)
+canonical_required_columns <- c("rule_name", "rule_id", "criterion_text")
+canonical_missing_columns <- setdiff(
+  canonical_required_columns,
+  names(canonical_saved_columns)
+)
+if (length(canonical_missing_columns) > 0L) {
+  stop(
+    "Canonical saved-column review is missing required column(s): ",
+    paste(canonical_missing_columns, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+canonical_saved_column_keys <- paste(
+  canonical_saved_columns$rule_name,
+  canonical_saved_columns$rule_id,
+  sep = "\r"
+)
+if (anyDuplicated(canonical_saved_column_keys)) {
+  stop(
+    "Canonical saved-column review contains duplicate rule_name/rule_id keys.",
+    call. = FALSE
+  )
+}
+
 campus_sheets <- readxl::excel_sheets(input_path)
 campus_sheets <- campus_sheets[grepl("^UC[A-Z]+$", campus_sheets)]
 
@@ -132,6 +172,38 @@ as_text <- function(x) {
   x <- as.character(x)
   x[is.na(x)] <- ""
   x
+}
+
+refresh_saved_column_criteria <- function(data, campus) {
+  saved_column_rows <- as_text(data$rule_type) == "Saved Column"
+  normalized_keys <- paste(
+    as_text(data$rule_name),
+    as_text(data$rule_id),
+    sep = "\r"
+  )
+  canonical_rows <- match(normalized_keys, canonical_saved_column_keys)
+  refresh_rows <- saved_column_rows & !is.na(canonical_rows)
+
+  unmatched_rows <- saved_column_rows & is.na(canonical_rows)
+  if (any(unmatched_rows)) {
+    stop(
+      "Worksheet '", campus, "' contains saved-column rule(s) that are not ",
+      "present in the canonical saved-column review: ",
+      paste(unique(normalized_keys[unmatched_rows]), collapse = "; "),
+      call. = FALSE
+    )
+  }
+
+  canonical_criteria <- canonical_saved_columns$criterion_text[canonical_rows[refresh_rows]]
+  changed_rows <- refresh_rows
+  changed_rows[refresh_rows] <- as_text(data$criterion_text[refresh_rows]) != canonical_criteria
+  data$criterion_text[refresh_rows] <- canonical_criteria
+
+  message(
+    "Refreshed ", sum(changed_rows),
+    " stale saved-column criterion/criteria on worksheet ", campus
+  )
+  data
 }
 
 first_seen <- function(x) {
@@ -488,6 +560,7 @@ for (campus in campus_sheets) {
   }
 
   data <- data[, expected_columns, drop = FALSE]
+  data <- refresh_saved_column_criteria(data, campus)
   campus_code <- if (grepl("^UC", campus)) campus else paste0("UC", campus)
   output_name <- paste0(
     campus_code, "_targeted_review_", fiscal_year_filename,

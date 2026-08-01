@@ -30,5 +30,33 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     !file.exists(file.path(output_dir, "saved_columns.csv")),
     !file.exists(file.path(output_dir, "saved_column_review.xlsx"))
   )
+
+  equality_condition <- xml2::read_xml(paste0(
+    "<condition xmlns:sawx='com.siebel.analytics.web/expression/v1.1' ",
+    "xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>",
+    "<sawx:expr xsi:type='sawx:comparison' op='equal'>",
+    "<sawx:expr xsi:type='sawx:sqlExpression'>&quot;Borrower Details&quot;.&quot;User Group&quot;</sawx:expr>",
+    "<sawx:expr xsi:type='xsd:string'>UCM Faculty</sawx:expr>",
+    "</sawx:expr></condition>"
+  ))
+  list_condition <- xml2::read_xml(paste0(
+    "<condition xmlns:sawx='com.siebel.analytics.web/expression/v1.1' ",
+    "xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>",
+    "<sawx:expr xsi:type='sawx:list' op='in'>",
+    "<sawx:expr xsi:type='sawx:sqlExpression'>field_name</sawx:expr>",
+    "<sawx:expr xsi:type='xsd:string'>Library Staff</sawx:expr>",
+    "<sawx:expr xsi:type='xsd:string'>UCM Staff</sawx:expr>",
+    "</sawx:expr></condition>"
+  ))
+  stopifnot(
+    identical(
+      format_saved_column_condition(equality_condition),
+      "\"Borrower Details\".\"User Group\" = 'UCM Faculty'"
+    ),
+    identical(
+      format_saved_column_condition(list_condition),
+      "field_name IN ('Library Staff', 'UCM Staff')"
+    )
+  )
   message("Base-R fixture assertions passed.")
 }

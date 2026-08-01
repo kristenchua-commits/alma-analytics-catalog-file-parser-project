@@ -1,3 +1,106 @@
+# Convert a saved-column expression node to normalized text.
+saved_column_clean_text <- function(node) {
+  if (inherits(node, "xml_missing") || !length(node)) return(NA_character_)
+  value <- trimws(gsub("[[:space:]]+", " ", xml2::xml_text(node)))
+  if (!nzchar(value)) NA_character_ else value
+}
+
+# Format an Alma expression value as a SQL literal. Alma stores string and
+# numeric values in the same XML shape, so the xsi:type determines quoting.
+saved_column_sql_literal <- function(node) {
+  value <- saved_column_clean_text(node)
+  if (is.na(value)) return(NA_character_)
+
+  value_type <- xml2::xml_attr(node, "type")
+  if (!is.na(value_type) && grepl(
+    "decimal|double|float|integer|long|number|short",
+    value_type,
+    ignore.case = TRUE
+  )) {
+    return(value)
+  }
+  if (!is.na(value_type) && grepl("boolean", value_type, ignore.case = TRUE)) {
+    return(toupper(value))
+  }
+
+  paste0("'", gsub("'", "''", value, fixed = TRUE), "'")
+}
+
+# Translate Alma saved-column XML operators to SQL criteria. Raw sawx:sql
+# expressions already contain SQL and pass through unchanged.
+format_saved_column_condition <- function(condition_node) {
+  expression <- xml2::xml_find_first(condition_node, "./*[local-name()='expr']")
+  if (inherits(expression, "xml_missing")) return(NA_character_)
+
+  expression_type <- xml2::xml_attr(expression, "type")
+  children <- xml2::xml_find_all(expression, "./*[local-name()='expr']")
+  if (!length(children)) return(saved_column_clean_text(expression))
+
+  operator <- xml2::xml_attr(expression, "op")
+  field <- saved_column_clean_text(children[[1L]])
+  if (is.na(field) || is.na(operator)) {
+    stop("Structured saved-column expression is missing its field or operator.")
+  }
+
+  if (!is.na(expression_type) && grepl("comparison", expression_type, fixed = TRUE)) {
+    if (operator == "null") return(paste(field, "IS NULL"))
+    if (operator == "notNull") return(paste(field, "IS NOT NULL"))
+
+    comparison_operators <- c(
+      equal = "=",
+      notEqual = "<>",
+      greater = ">",
+      greaterThan = ">",
+      greaterOrEqual = ">=",
+      greaterThanOrEqual = ">=",
+      less = "<",
+      lessThan = "<",
+      lessOrEqual = "<=",
+      lessThanOrEqual = "<="
+    )
+    sql_operator <- unname(comparison_operators[operator])
+    if (is.na(sql_operator)) {
+      stop("Unsupported Alma saved-column comparison operator: ", operator)
+    }
+    if (length(children) < 2L) {
+      stop("Alma saved-column comparison operator has no right-hand value: ", operator)
+    }
+    values <- vapply(children[-1L], saved_column_sql_literal, character(1))
+    return(paste(field, sql_operator, paste(values, collapse = ", ")))
+  }
+
+  if (!is.na(expression_type) && grepl("list", expression_type, fixed = TRUE)) {
+    if (length(children) < 2L) {
+      stop("Alma saved-column list operator has no values: ", operator)
+    }
+    values <- vapply(children[-1L], saved_column_sql_literal, character(1))
+
+    if (operator %in% c("in", "notIn")) {
+      sql_operator <- if (operator == "notIn") "NOT IN" else "IN"
+      return(paste0(field, " ", sql_operator, " (", paste(values, collapse = ", "), ")"))
+    }
+
+    raw_values <- vapply(children[-1L], saved_column_clean_text, character(1))
+    wildcard_values <- switch(
+      operator,
+      beginsWith = paste0(raw_values, "%"),
+      endsWith = paste0("%", raw_values),
+      contains = paste0("%", raw_values, "%"),
+      stop("Unsupported Alma saved-column list operator: ", operator)
+    )
+    like_clauses <- paste0(
+      field,
+      " LIKE '",
+      gsub("'", "''", wildcard_values, fixed = TRUE),
+      "'"
+    )
+    if (length(like_clauses) == 1L) return(like_clauses)
+    return(paste0("(", paste(like_clauses, collapse = " OR "), ")"))
+  }
+
+  saved_column_clean_text(expression)
+}
+
 # Stage 3: create a documentation-oriented saved-column review workbook.
 export_saved_column_review <- function(
     input_path = "output/catalog_extract.rds",
@@ -15,65 +118,8 @@ export_saved_column_review <- function(
   catalog <- catalog[catalog$object_kind == "saved_column", , drop = FALSE]
   if (!nrow(catalog)) stop("No saved-column objects were found.")
 
-  clean_text <- function(node) {
-    if (inherits(node, "xml_missing") || !length(node)) return(NA_character_)
-    value <- trimws(gsub("[[:space:]]+", " ", xml2::xml_text(node)))
-    if (!nzchar(value)) NA_character_ else value
-  }
+  clean_text <- saved_column_clean_text
   find_text <- function(node, xpath) clean_text(xml2::xml_find_first(node, xpath))
-  format_condition <- function(condition_node) {
-    expression <- xml2::xml_find_first(condition_node, "./*[local-name()='expr']")
-    if (inherits(expression, "xml_missing")) return(NA_character_)
-
-    expression_type <- xml2::xml_attr(expression, "type")
-    children <- xml2::xml_find_all(expression, "./*[local-name()='expr']")
-
-    # Null checks are stored as structured comparison expressions whose only
-    # text is the field name. Preserve the operator that Alma displays in the
-    # Bins editor instead of silently returning only that field name.
-    if (!is.na(expression_type) && grepl("comparison", expression_type, fixed = TRUE) &&
-        length(children)) {
-      operator <- xml2::xml_attr(expression, "op")
-      parts <- vapply(children, clean_text, character(1))
-      parts <- parts[!is.na(parts) & nzchar(parts)]
-      field <- if (length(parts)) parts[[1L]] else NA_character_
-
-      if (!is.na(field) && !is.na(operator) && operator == "null") {
-        return(paste0(field, " is null"))
-      }
-      if (!is.na(field) && !is.na(operator) && operator == "notNull") {
-        return(paste0(field, " is not null"))
-      }
-      if (!is.na(field) && !is.na(operator) && operator == "equal" &&
-          length(parts) >= 2L) {
-        return(paste0(field, " is equal to ", paste(parts[-1L], collapse = "; ")))
-      }
-    }
-
-    # OBIEE list expressions store the field and every allowed value in
-    # separate child nodes. xml_text() concatenates them without delimiters,
-    # so join the parts explicitly for a readable spreadsheet criterion.
-    if (!is.na(expression_type) && grepl("list", expression_type, fixed = TRUE) &&
-        length(children)) {
-      parts <- vapply(children, clean_text, character(1))
-      parts <- parts[!is.na(parts) & nzchar(parts)]
-      if (!length(parts)) return(NA_character_)
-
-      operator <- xml2::xml_attr(expression, "op")
-      operator_label <- if (!is.na(operator) && operator == "notIn") {
-        " is not equal to / is not in "
-      } else if (!is.na(operator) && operator == "beginsWith") {
-        " begins with "
-      } else {
-        " is equal to / is in "
-      }
-
-      if (length(parts) == 1L) return(paste0(parts[1L], operator_label))
-      return(paste0(parts[1L], operator_label, paste(parts[-1L], collapse = "; ")))
-    }
-
-    clean_text(expression)
-  }
 
   review_rows <- list()
   object_rows <- list()
@@ -101,7 +147,7 @@ export_saved_column_review <- function(
         review_rows[[length(review_rows) + 1L]] <- data.frame(
           saved_column_name = catalog$object_title[i],
           rule_id = paste0("SC", i, "-R", j),
-          bin_criterion = format_condition(
+          bin_criterion = format_saved_column_condition(
             xml2::xml_find_first(rules[[j]], ".//*[local-name()='condition']")
           ),
           bin_label = find_text(rules[[j]], ".//*[local-name()='value']/*[local-name()='expr']"),
