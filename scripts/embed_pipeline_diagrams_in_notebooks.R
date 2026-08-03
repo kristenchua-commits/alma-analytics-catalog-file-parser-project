@@ -1,73 +1,113 @@
-# Embed pipeline PNGs as notebook attachments so private GitHub repositories
-# can render them without unauthenticated raw-image requests.
+# Embed pipeline PNGs as standard notebook display outputs. GitHub reliably
+# renders saved image/png outputs, including for private repositories.
 
 if (!requireNamespace("jsonlite", quietly = TRUE)) {
   stop("The jsonlite package is required to embed notebook images.")
 }
 
-embed_png_attachment <- function(
-    notebook_path,
-    image_path,
-    heading,
-    attachment_name,
-    alt_text) {
-  lines <- readLines(notebook_path, warn = FALSE)
+encode_png <- function(image_path) {
+  image_size <- file.info(image_path)$size
+  image_raw <- readBin(image_path, what = "raw", n = image_size)
+  gsub("[[:space:]]", "", jsonlite::base64_enc(image_raw))
+}
+
+find_cell_bounds <- function(lines, matching_line) {
+  cell_starts <- which(lines[seq_len(matching_line)] == "  {")
+  cell_start <- max(cell_starts)
+  later_lines <- seq.int(matching_line, length(lines))
+  cell_end_candidates <- later_lines[lines[later_lines] %in% c("  },", "  }")]
+  if (!length(cell_end_candidates)) stop("Could not locate a notebook cell boundary.")
+  c(start = cell_start, end = cell_end_candidates[[1L]])
+}
+
+remove_markdown_attachment <- function(lines, heading, image_name) {
   heading_pattern <- paste0('"## ', heading, '\\n"')
   heading_line <- grep(heading_pattern, lines, fixed = TRUE)
   if (length(heading_line) != 1L) {
     stop("Could not uniquely locate notebook heading: ", heading)
   }
+  bounds <- find_cell_bounds(lines, heading_line)
+  cell_lines <- seq.int(bounds[["start"]], bounds[["end"]])
 
-  cell_starts <- which(trimws(lines[seq_len(heading_line)]) == "{")
-  cell_start <- max(cell_starts)
-  later_lines <- seq.int(heading_line, length(lines))
-  cell_end_candidates <- later_lines[trimws(lines[later_lines]) %in% c("},", "}")]
-  if (!length(cell_end_candidates)) stop("Could not locate the notebook cell boundary.")
-  cell_end <- cell_end_candidates[[1L]]
-
-  cell_lines <- seq.int(cell_start, cell_end)
-  metadata_line <- cell_lines[grepl('"metadata":', lines[cell_lines], fixed = TRUE)]
   image_line <- cell_lines[
     grepl("![", lines[cell_lines], fixed = TRUE) &
-      grepl(attachment_name, lines[cell_lines], fixed = TRUE)
+      grepl(image_name, lines[cell_lines], fixed = TRUE)
   ]
-  if (length(metadata_line) != 1L || length(image_line) != 1L) {
-    stop("Could not uniquely locate the target cell metadata and image reference.")
+  if (length(image_line) == 1L) lines <- lines[-image_line]
+
+  heading_line <- grep(heading_pattern, lines, fixed = TRUE)
+  bounds <- find_cell_bounds(lines, heading_line)
+  cell_lines <- seq.int(bounds[["start"]], bounds[["end"]])
+  attachment_start <- cell_lines[
+    grepl('"attachments": {', lines[cell_lines], fixed = TRUE)
+  ]
+  if (length(attachment_start) == 1L) {
+    attachment_key <- cell_lines[
+      grepl(paste0('"', image_name, '": {'), lines[cell_lines], fixed = TRUE)
+    ]
+    if (length(attachment_key) != 1L) {
+      stop("Could not uniquely locate the embedded Markdown attachment.")
+    }
+    attachment_end <- attachment_key + 3L
+    lines <- lines[-seq.int(attachment_start, attachment_end)]
   }
 
-  image_size <- file.info(image_path)$size
-  image_raw <- readBin(image_path, what = "raw", n = image_size)
-  encoded_image <- gsub(
-    "[[:space:]]",
-    "",
-    jsonlite::base64_enc(image_raw)
-  )
-  attachment_lines <- c(
-    '   "attachments": {',
-    paste0('    "', attachment_name, '": {'),
-    paste0('     "image/png": "', encoded_image, '"'),
-    "    }",
-    "   },"
-  )
+  lines
+}
 
-  lines[image_line] <- paste0(
-    '    "![', alt_text, '](attachment:', attachment_name, ')\\n",'
-  )
-  attachment_key <- cell_lines[grepl(
-    paste0('"', attachment_name, '": {'),
-    lines[cell_lines],
-    fixed = TRUE
-  )]
-  if (length(attachment_key) == 1L) {
-    lines[attachment_key + 1L] <- attachment_lines[[3L]]
-  } else if (!length(attachment_key)) {
-    lines <- append(lines, attachment_lines, after = metadata_line)
+embed_png_output <- function(
+    notebook_path,
+    image_path,
+    heading,
+    image_name,
+    alt_text) {
+  lines <- readLines(notebook_path, warn = FALSE)
+  encoded_image <- encode_png(image_path)
+  marker <- paste0('"pipeline_diagram": "', image_name, '"')
+  existing_marker <- grep(marker, lines, fixed = TRUE)
+
+  if (length(existing_marker) == 1L) {
+    bounds <- find_cell_bounds(lines, existing_marker)
+    cell_lines <- seq.int(bounds[["start"]], bounds[["end"]])
+    png_line <- cell_lines[grepl('"image/png":', lines[cell_lines], fixed = TRUE)]
+    if (length(png_line) != 1L) stop("Could not locate the saved PNG output.")
+    lines[png_line] <- paste0('      "image/png": "', encoded_image, '",')
+  } else if (!length(existing_marker)) {
+    lines <- remove_markdown_attachment(lines, heading, image_name)
+    heading_pattern <- paste0('"## ', heading, '\\n"')
+    heading_line <- grep(heading_pattern, lines, fixed = TRUE)
+    bounds <- find_cell_bounds(lines, heading_line)
+    output_cell <- c(
+      "  {",
+      '   "cell_type": "code",',
+      '   "execution_count": null,',
+      '   "metadata": {',
+      paste0('    "pipeline_diagram": "', image_name, '"'),
+      "   },",
+      '   "outputs": [',
+      "    {",
+      '     "data": {',
+      paste0('      "image/png": "', encoded_image, '",'),
+      '      "text/plain": [',
+      paste0('       "<', alt_text, '>"'),
+      "      ]",
+      "     },",
+      '     "metadata": {},',
+      '     "output_type": "display_data"',
+      "    }",
+      "   ],",
+      '   "source": [',
+      '    "# Embedded pipeline diagram for GitHub and Jupyter previews.\\n"',
+      "   ]",
+      "  },"
+    )
+    lines <- append(lines, output_cell, after = bounds[["end"]])
   } else {
-    stop("The target notebook cell contains duplicate image attachments.")
+    stop("The notebook contains duplicate pipeline-diagram output cells.")
   }
 
   temporary_path <- tempfile(
-    pattern = "notebook-with-attachment-",
+    pattern = "notebook-with-image-output-",
     tmpdir = dirname(notebook_path),
     fileext = ".ipynb"
   )
@@ -75,25 +115,15 @@ embed_png_attachment <- function(
   writeLines(lines, temporary_path, useBytes = TRUE)
   temporary_json <- paste(readLines(temporary_path, warn = FALSE), collapse = "\n")
   if (!jsonlite::validate(temporary_json)) {
-    validation_error <- tryCatch(
-      {
-        jsonlite::fromJSON(temporary_json, simplifyVector = FALSE)
-        "Unknown JSON validation error."
-      },
-      error = function(error) conditionMessage(error)
-    )
-    stop(
-      "Embedding the image produced invalid JSON: ", notebook_path,
-      "\n", validation_error
-    )
+    stop("Embedding the image produced invalid JSON: ", notebook_path)
   }
   if (!file.rename(temporary_path, notebook_path)) {
     stop("Could not replace notebook after validating the embedded image.")
   }
-  message("Embedded ", attachment_name, " in ", notebook_path)
+  message("Embedded saved image output in ", notebook_path)
 }
 
-embed_png_attachment(
+embed_png_output(
   notebook_path = file.path(
     "documentation", "notebooks",
     "campus_saved_column_filter_documentation_construction.ipynb"
@@ -102,14 +132,14 @@ embed_png_attachment(
     "documentation", "images", "run_report_builder_pipeline_diagram.png"
   ),
   heading = "Report-builder pipeline map",
-  attachment_name = "run_report_builder_pipeline_diagram.png",
+  image_name = "run_report_builder_pipeline_diagram.png",
   alt_text = paste(
     "Alma Analytics report-builder pipeline from parser review outputs through",
     "campus exclusions-documentation workbooks"
   )
 )
 
-embed_png_attachment(
+embed_png_output(
   notebook_path = file.path(
     "documentation", "notebooks", "alma_analytics_catalog_file_parser.ipynb"
   ),
@@ -117,7 +147,7 @@ embed_png_attachment(
     "documentation", "images", "run_parser_pipeline_diagram.png"
   ),
   heading = "Automated parser pipeline map",
-  attachment_name = "run_parser_pipeline_diagram.png",
+  image_name = "run_parser_pipeline_diagram.png",
   alt_text = paste(
     "Alma Analytics catalog parser pipeline showing every processing script,",
     "input, intermediate dataset, and output"
