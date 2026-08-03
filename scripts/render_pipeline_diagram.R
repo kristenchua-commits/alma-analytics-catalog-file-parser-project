@@ -1,7 +1,7 @@
 # Create a flow diagram of the Alma Analytics .catalog parsing pipeline.
 
 render_pipeline_diagram <- function(
-    output_path = "docs/images/run_parser_pipeline_diagram.png",
+    output_path = "documentation/images/run_parser_pipeline_diagram.png",
     width = 16,
     height = 12) {
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
@@ -214,7 +214,9 @@ render_pipeline_diagram <- function(
 
 if (!interactive() && sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
-  output_path <- if (length(args)) args[1L] else "docs/images/run_parser_pipeline_diagram.png"
+  output_path <- if (length(args)) args[1L] else {
+    "documentation/images/run_parser_pipeline_diagram.png"
+  }
   diagram_path <- render_pipeline_diagram(output_path)
   message("Wrote ", diagram_path)
 }

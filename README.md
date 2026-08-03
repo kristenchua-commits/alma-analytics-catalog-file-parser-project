@@ -52,7 +52,7 @@ catalog <- run_catalog_pipeline()
 
 ## Parser pipeline map
 
-![Alma Analytics catalog parser pipeline showing every processing script, input, intermediate dataset, and output](docs/images/run_parser_pipeline_diagram.png)
+![Alma Analytics catalog parser pipeline showing every processing script, input, intermediate dataset, and output](documentation/images/run_parser_pipeline_diagram.png)
 
 The diagram covers the automated `.catalog` parser. The arrows show the
 direction of processing. Blue identifies the original input, green identifies
@@ -69,7 +69,7 @@ are intentionally thin entry points.
 
 ## Report-builder pipeline map
 
-![Alma Analytics report builder pipeline showing parser review outputs, manual normalization, publication scripts, and campus workbooks](docs/images/run_report_builder_pipeline_diagram.png)
+![Alma Analytics report builder pipeline showing parser review outputs, manual normalization, publication scripts, and campus workbooks](documentation/images/run_report_builder_pipeline_diagram.png)
 
 Regenerate this diagram from the repository root with:
 

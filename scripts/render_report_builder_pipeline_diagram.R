@@ -1,7 +1,7 @@
 # Create a flow diagram of the reviewed campus report-building workflow.
 
 render_report_builder_pipeline_diagram <- function(
-    output_path = "docs/images/run_report_builder_pipeline_diagram.png",
+    output_path = "documentation/images/run_report_builder_pipeline_diagram.png",
     width = 16,
     height = 10) {
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
@@ -311,7 +311,7 @@ if (!interactive() && sys.nframe() == 0L) {
   output_path <- if (length(args)) {
     args[[1L]]
   } else {
-    "docs/images/run_report_builder_pipeline_diagram.png"
+    "documentation/images/run_report_builder_pipeline_diagram.png"
   }
   diagram_path <- render_report_builder_pipeline_diagram(output_path)
   message("Wrote ", diagram_path)
