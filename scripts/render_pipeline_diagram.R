@@ -1,7 +1,7 @@
 # Create a flow diagram of the Alma Analytics .catalog parsing pipeline.
 
 render_pipeline_diagram <- function(
-    output_path = "docs/images/run_pipeline_diagram.png",
+    output_path = "docs/images/run_parser_pipeline_diagram.png",
     width = 16,
     height = 12) {
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
@@ -90,7 +90,7 @@ render_pipeline_diagram <- function(
   draw_box(11.6, 10.65, 3.8, 0.72, "Raw Alma Analytics .catalog file",
            palette$input, font = 2, cex = 0.88)
   draw_box(8, 9.55, 4.4, 0.88,
-           "Pipeline orchestrator\nscripts/run_parsing_pipeline.R\nR/run_pipeline.R",
+           "Pipeline orchestrator\nscripts/run_parsing_pipeline.R\nR/run_parsing_pipeline.R",
            palette$process, font = 2, cex = 0.68)
   connect(4.4, 10.65, 8, 9.55, 0.44, 0.44)
   connect(11.6, 10.65, 8, 9.55, 0.36, 0.44)
@@ -214,7 +214,7 @@ render_pipeline_diagram <- function(
 
 if (!interactive() && sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
-  output_path <- if (length(args)) args[1L] else "docs/images/run_pipeline_diagram.png"
+  output_path <- if (length(args)) args[1L] else "docs/images/run_parser_pipeline_diagram.png"
   diagram_path <- render_pipeline_diagram(output_path)
   message("Wrote ", diagram_path)
 }

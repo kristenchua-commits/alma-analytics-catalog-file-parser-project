@@ -13,8 +13,8 @@ if (is.na(catalog_selector_source_file)) {
   catalog_selector_source_file <- normalizePath(candidates[1L], mustWork = TRUE)
 }
 catalog_project_root <- dirname(dirname(catalog_selector_source_file))
-if (!exists("run_pipeline", mode = "function")) {
-  source(file.path(catalog_project_root, "R", "run_pipeline.R"))
+if (!exists("run_parsing_pipeline", mode = "function")) {
+  source(file.path(catalog_project_root, "R", "run_parsing_pipeline.R"))
 }
 
 find_catalog_files <- function(
@@ -95,5 +95,5 @@ run_catalog_pipeline <- function(
 
   catalog_path <- normalizePath(catalog_path, mustWork = TRUE)
   message("Selected catalog: ", catalog_path)
-  run_pipeline(catalog_path = catalog_path, output_dir = output_dir)
+  run_parsing_pipeline(catalog_path = catalog_path, output_dir = output_dir)
 }

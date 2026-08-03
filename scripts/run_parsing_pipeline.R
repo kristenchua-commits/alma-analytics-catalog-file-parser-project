@@ -28,7 +28,7 @@ if (is.na(script_source_file)) {
   }
 }
 script_project_root <- dirname(dirname(script_source_file))
-source(file.path(script_project_root, "R", "run_pipeline.R"))
+source(file.path(script_project_root, "R", "run_parsing_pipeline.R"))
 
 if (!interactive() && sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
@@ -39,7 +39,7 @@ if (!interactive() && sys.nframe() == 0L) {
     ))
   }
 
-  run_pipeline(
+  run_parsing_pipeline(
     catalog_path = args[1L],
     output_dir = if (length(args) > 1L) args[2L] else file.path(script_project_root, "output")
   )

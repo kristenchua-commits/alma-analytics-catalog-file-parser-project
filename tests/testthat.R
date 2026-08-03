@@ -2,14 +2,14 @@ if (requireNamespace("testthat", quietly = TRUE)) {
   testthat::test_dir("tests/testthat", reporter = "summary")
 } else {
   message("Package 'testthat' is unavailable; running the fixture assertions with base R.")
-  source("R/run_pipeline.R")
+  source("R/run_parsing_pipeline.R")
 
   fixture <- "data/filters_annual_statistics_2025_26.catalog"
   output_dir <- tempfile("filter-pipeline-output-")
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
 
-  catalog <- run_pipeline(fixture, output_dir)
+  catalog <- run_parsing_pipeline(fixture, output_dir)
   expected_files <- c(
     "catalog_extract.rds",
     "catalog_extract_summary.csv",

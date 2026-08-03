@@ -52,7 +52,7 @@ catalog <- run_catalog_pipeline()
 
 ## Parser pipeline map
 
-![Alma Analytics catalog parser pipeline showing every processing script, input, intermediate dataset, and output](docs/images/run_pipeline_diagram.png)
+![Alma Analytics catalog parser pipeline showing every processing script, input, intermediate dataset, and output](docs/images/run_parser_pipeline_diagram.png)
 
 The diagram covers the automated `.catalog` parser. The arrows show the
 direction of processing. Blue identifies the original input, green identifies
@@ -64,12 +64,28 @@ below.
 `scripts/choose_catalog_file_and_run_pipeline.R` is an optional interactive
 entry point. It selects a `.catalog` file and passes it to
 `scripts/run_parsing_pipeline.R`, the command-line entry point for the orchestrator in
-`R/run_pipeline.R`. Reusable functions live under `R/`; scripts under `scripts/`
+`R/run_parsing_pipeline.R`. Reusable functions live under `R/`; scripts under `scripts/`
 are intentionally thin entry points.
+
+## Report-builder pipeline map
+
+![Alma Analytics report builder pipeline showing parser review outputs, manual normalization, publication scripts, and campus workbooks](docs/images/run_report_builder_pipeline_diagram.png)
+
+Regenerate this diagram from the repository root with:
+
+```sh
+Rscript scripts/render_report_builder_pipeline_diagram.R
+```
+
+The report-builder diagram begins at the parser's saved-column and filter
+review outputs. It shows the manual normalization checkpoint, the optional
+validation notebook, the campus documentation exporter, and the final campus
+workbooks. The technical `filter_criteria.csv` branch is shown separately
+because it does not feed the report builder.
 
 | Stage | Script(s) | Reads | Writes |
 | --- | --- | --- | --- |
-| Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_parsing_pipeline.R`; `R/choose_catalog_file.R`; `R/run_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
+| Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_parsing_pipeline.R`; `R/choose_catalog_file.R`; `R/run_parsing_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
 | Shared catalog extraction | `R/extract/extract_catalog.R`; `R/io/read_catalog_file.R`; `R/io/read_catalog_metadata.R` | `.catalog` file | `catalog_extract.rds`; `catalog_extract_summary.csv` |
 | Metadata and XML-tag inspection | `R/inspect/inspect_catalog_metadata.R`; `R/extract/extract_xml_tag_inventory.R` | `catalog_extract.rds` | `catalog_metadata_inventory.csv`; `xml_tag_inventory.csv` |
 | Saved-column parsing and review | `R/extract/extract_saved_columns.R`; `R/export/export_saved_column_review.R` | Saved-column rows in `catalog_extract.rds` | `saved_columns.csv`; `saved_column_review.xlsx`; `saved_column_review.csv` |
@@ -133,7 +149,7 @@ the corresponding object type is absent.
 
 ### Reviewed publication workflow
 
-`run_pipeline()` ends after creating the saved-column and filter review files.
+`run_parsing_pipeline()` ends after creating the saved-column and filter review files.
 It does not create the normalized combined workbook automatically.
 
 `output/normalized_combined_saved_column_and_filter_review.xlsx` is a reviewed
@@ -205,7 +221,7 @@ Campus documentation filenames use this pattern:
 | `filter_review.xlsx` | Filter business rules in the shared review schema, plus value-list and object-index sheets |
 | `filter_review.csv` | CSV version of the filter rules in the shared review schema |
 | `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
-| `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_pipeline()` |
+| `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_parsing_pipeline()` |
 | `Campus FY 2025-26 annual statistics NZ-level output/2025/2026/*.xlsx` | Campus-specific documentation created by the separate publication script |
 
 Automated parser files are written directly under `output/`. The pipeline

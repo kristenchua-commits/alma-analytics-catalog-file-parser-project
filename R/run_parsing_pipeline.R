@@ -5,11 +5,13 @@ pipeline_source_file <- tryCatch(
 )
 if (is.na(pipeline_source_file)) {
   candidates <- c(
-    file.path(getwd(), "R", "run_pipeline.R"),
-    file.path(getwd(), "run_pipeline.R")
+    file.path(getwd(), "R", "run_parsing_pipeline.R"),
+    file.path(getwd(), "run_parsing_pipeline.R")
   )
   candidates <- candidates[file.exists(candidates)]
-  if (!length(candidates)) stop("Could not determine the project root for run_pipeline.R.")
+  if (!length(candidates)) {
+    stop("Could not determine the project root for run_parsing_pipeline.R.")
+  }
   pipeline_source_file <- normalizePath(candidates[1L], mustWork = TRUE)
 }
 pipeline_project_root <- dirname(dirname(pipeline_source_file))
@@ -30,7 +32,7 @@ for (pipeline_file in pipeline_files) {
   source(file.path(pipeline_project_root, pipeline_file))
 }
 
-run_pipeline <- function(
+run_parsing_pipeline <- function(
     catalog_path,
     output_dir = file.path(pipeline_project_root, "output")) {
   if (!file.exists(catalog_path)) {

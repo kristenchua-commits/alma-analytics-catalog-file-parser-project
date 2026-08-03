@@ -1,6 +1,6 @@
 project_root <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = TRUE)
 original_working_directory <- setwd(project_root)
-source("R/run_pipeline.R")
+source("R/run_parsing_pipeline.R")
 setwd(original_working_directory)
 
 testthat::test_that("the filter fixture runs through the complete filter branch", {
@@ -14,7 +14,7 @@ testthat::test_that("the filter fixture runs through the complete filter branch"
 
   original_working_directory <- setwd(project_root)
   on.exit(setwd(original_working_directory), add = TRUE)
-  catalog <- run_pipeline(fixture, output_dir)
+  catalog <- run_parsing_pipeline(fixture, output_dir)
 
   expected_files <- c(
     "catalog_extract.rds",
