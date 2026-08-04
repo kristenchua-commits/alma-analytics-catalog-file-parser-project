@@ -1,4 +1,24 @@
 # Stage 3: create a concise, documentation-oriented filter review workbook.
+filter_review_cell_character_limit <- 32767L
+
+format_filter_list_criterion <- function(
+    field,
+    keyword,
+    display_values,
+    cell_character_limit = filter_review_cell_character_limit) {
+  expanded_criterion <- paste0(
+    field, " ", keyword, " (", paste(display_values, collapse = ", "), ")"
+  )
+  if (nchar(expanded_criterion, type = "chars") <= cell_character_limit) {
+    return(expanded_criterion)
+  }
+  paste0(
+    field, " ", keyword, " (",
+    format(length(display_values), big.mark = ","),
+    " values; see Value List Summary and companion CSV)"
+  )
+}
+
 export_filter_review <- function(
     input_path = "output/filter_objects.rds",
     output_xlsx = "output/filter_review.xlsx",
@@ -93,12 +113,7 @@ export_filter_review <- function(
       value_types <- vapply(children[-1L], node_type, character(1))
       display_values <- mapply(quote_value, raw_values, value_types, USE.NAMES = FALSE)
       keyword <- if (operator == "notIn") "NOT IN" else "IN"
-      criterion <- if (length(display_values) <= 12L) {
-        paste0(field, " ", keyword, " (", paste(display_values, collapse = ", "), ")")
-      } else {
-        paste0(field, " ", keyword, " (", format(length(display_values), big.mark = ","),
-               " values; see Value List Summary and companion CSV)")
-      }
+      criterion <- format_filter_list_criterion(field, keyword, display_values)
       add_rule(filter_row, criterion, join_operator, raw_values, field)
       return(invisible(NULL))
     }
