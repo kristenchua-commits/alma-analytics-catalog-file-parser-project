@@ -46,7 +46,9 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     "<saw:columnFormula><sawx:expr xsi:type='sawx:sqlExpression'>",
     "&quot;Location&quot;.&quot;Library Code&quot;</sawx:expr></saw:columnFormula>",
     "</saw:column><saw:column xsi:type='saw:savedRegularColumnRef' ",
-    "columnID='saved-1' path='", saved_column_path, "'/></saw:columns>",
+    "columnID='saved-1' path='", saved_column_path, "'>",
+    "<saw:columnHeading><saw:caption><saw:text>Short report heading</saw:text>",
+    "</saw:caption></saw:columnHeading></saw:column></saw:columns>",
     "<saw:filter><sawx:expr xsi:type='sawx:logical' op='and'>",
     "<sawx:expr xsi:type='sawx:comparison' op='equal'>",
     "<sawx:expr xsi:type='sawx:sqlExpression'>",
@@ -60,7 +62,16 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     object_kind = c("report", "saved_column", "filter"),
     object_title = c("Test Report", "Test Saved Column", "Test Saved Filter"),
     original_path = c(report_path, saved_column_path, saved_filter_path),
-    xml_text = c(report_xml, "<savedColumnObject/>", "<savedFilterObject/>"),
+    xml_text = c(
+      report_xml,
+      paste0(
+        "<savedColumnObject xmlns:saw='com.siebel.analytics.web/report/v1.1'>",
+        "<saw:column><saw:columnHeading><saw:caption>",
+        "<saw:text>Canonical saved heading</saw:text>",
+        "</saw:caption></saw:columnHeading></saw:column></savedColumnObject>"
+      ),
+      "<savedFilterObject/>"
+    ),
     stringsAsFactors = FALSE
   )
   report_input <- tempfile(fileext = ".rds")
@@ -83,6 +94,11 @@ if (requireNamespace("testthat", quietly = TRUE)) {
   )
   stopifnot(
     nrow(report_columns) == 2L,
+    report_columns$column_name[report_columns$column_source == "saved_reference"] ==
+      "Canonical saved heading",
+    report_columns$report_display_name[
+      report_columns$column_source == "saved_reference"
+    ] == "Short report heading",
     nrow(report_filters) == 2L,
     nrow(report_dependencies) == 2L,
     all(report_dependencies$is_resolved)

@@ -165,9 +165,11 @@ includes definitions that were never saved as standalone catalog objects.
 
 `report_saved_and_non_saved_columns.csv` contains every report-selected column
 in one sheet. The `column_source` field distinguishes `inline` definitions from
-`saved_reference` rows. Saved references retain their full catalog path, while
-binned non-saved columns retain their base formula, expression type, and rule
-count.
+`saved_reference` rows. `column_name` is the canonical heading from the resolved
+saved-column object when available, while `report_display_name` preserves any
+shorter heading applied inside the individual report. Saved references also
+retain their saved-object name and full catalog path. Binned non-saved columns
+retain their base formula, expression type, and rule count.
 
 `report_saved_and_non_saved_filters.csv` contains every report filter term in
 one sheet. The `filter_source` field distinguishes `inline` terms from
@@ -273,7 +275,7 @@ Campus documentation filenames use this pattern:
 | `catalog_extract_summary.csv` | Object names, paths, kinds, and metadata |
 | `catalog_metadata_inventory.csv` | Counts and missing-field checks by object pattern |
 | `xml_tag_inventory.csv` | XML tags, paths, depths, attributes, and values |
-| `report_saved_and_non_saved_columns.csv` | All report-selected columns; `column_source` distinguishes non-saved definitions from saved-column references |
+| `report_saved_and_non_saved_columns.csv` | All report-selected columns, with canonical saved-column names and report-specific display headings kept separate |
 | `report_saved_and_non_saved_filters.csv` | All report filter terms; `filter_source` distinguishes non-saved definitions from saved-filter references |
 | `report_dependencies.csv` | Distinct report-to-saved-column/filter paths with target-resolution status |
 | `saved_columns.csv` | Parsed saved-column definitions |

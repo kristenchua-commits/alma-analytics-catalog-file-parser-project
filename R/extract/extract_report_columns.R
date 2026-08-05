@@ -13,6 +13,27 @@ extract_report_columns <- function(
   reports <- catalog[catalog$object_kind == "report", , drop = FALSE]
   if (!nrow(reports)) stop("No report objects were found.")
 
+  # A saved-column reference can carry a short, report-specific heading that
+  # differs from the heading stored on the referenced saved-column object.
+  # Resolve both so the export does not mistake the local heading for the
+  # canonical saved-column name.
+  saved_objects <- catalog[catalog$object_kind == "saved_column", , drop = FALSE]
+  saved_metadata <- lapply(seq_len(nrow(saved_objects)), function(i) {
+    doc <- tryCatch(xml2::read_xml(saved_objects$xml_text[[i]]), error = function(e) NULL)
+    saved_column <- if (is.null(doc)) NULL else {
+      xml2::xml_find_first(doc, ".//*[local-name()='column']")
+    }
+    heading <- if (is.null(saved_column)) NA_character_ else report_xml_first_text(
+      saved_column,
+      "./*[local-name()='columnHeading']//*[local-name()='caption']/*[local-name()='text']"
+    )
+    list(
+      object_name = saved_objects$object_title[[i]],
+      column_heading = heading
+    )
+  })
+  names(saved_metadata) <- saved_objects$original_path
+
   rows <- list()
   for (i in seq_len(nrow(reports))) {
     doc <- tryCatch(xml2::read_xml(reports$xml_text[[i]]), error = function(e) NULL)
@@ -32,6 +53,11 @@ extract_report_columns <- function(
       column <- columns[[j]]
       xml_type <- report_xml_local_type(column)
       saved_path <- report_xml_safe_attr(column, "path")
+      if (!is.na(saved_path)) {
+        # Alma escapes slashes that are part of an object name as `\/` in
+        # reference attributes, while catalog original_path stores `/`.
+        saved_path <- gsub("\\/", "/", saved_path, fixed = TRUE)
+      }
       source <- if (!is.na(saved_path) || identical(xml_type, "savedRegularColumnRef")) {
         "saved_reference"
       } else if (identical(xml_type, "regularColumn")) {
@@ -60,9 +86,19 @@ extract_report_columns <- function(
         column,
         "./*[local-name()='columnHeading']//*[local-name()='caption']/*[local-name()='text']"
       )
-      display_name <- if (!is.na(column_heading)) column_heading else if (!is.na(formula)) {
+      report_display_name <- if (!is.na(column_heading)) column_heading else if (!is.na(formula)) {
         formula
       } else if (!is.na(saved_path)) basename(saved_path) else NA_character_
+      resolved_saved <- if (!is.na(saved_path)) saved_metadata[[saved_path]] else NULL
+      saved_column_name <- if (is.null(resolved_saved)) NA_character_ else {
+        resolved_saved$object_name
+      }
+      saved_column_heading <- if (is.null(resolved_saved)) NA_character_ else {
+        resolved_saved$column_heading
+      }
+      column_name <- if (!is.na(saved_column_heading)) saved_column_heading else if (
+        !is.na(saved_column_name)
+      ) saved_column_name else report_display_name
 
       data.frame(
         report_catalog_index = reports$catalog_index[[i]],
@@ -73,12 +109,15 @@ extract_report_columns <- function(
         column_source = source,
         column_xml_type = xml_type,
         column_id = report_xml_safe_attr(column, "columnID"),
-        display_name = display_name,
+        column_name = column_name,
+        report_display_name = report_display_name,
         table_heading = table_heading,
         column_heading = column_heading,
         formula_type = formula_type,
         formula = formula,
         bin_rule_count = bin_rule_count,
+        saved_column_name = saved_column_name,
+        saved_column_heading = saved_column_heading,
         saved_column_path = saved_path,
         stringsAsFactors = FALSE
       )
@@ -93,12 +132,15 @@ extract_report_columns <- function(
     column_source = character(),
     column_xml_type = character(),
     column_id = character(),
-    display_name = character(),
+    column_name = character(),
+    report_display_name = character(),
     table_heading = character(),
     column_heading = character(),
     formula_type = character(),
     formula = character(),
     bin_rule_count = integer(),
+    saved_column_name = character(),
+    saved_column_heading = character(),
     saved_column_path = character(),
     stringsAsFactors = FALSE
   )

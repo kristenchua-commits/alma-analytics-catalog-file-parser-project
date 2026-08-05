@@ -19,7 +19,9 @@ testthat::test_that("report columns, filters, and dependencies include inline an
     "&quot;Location&quot;.&quot;Library Code&quot;",
     "</sawx:expr></saw:columnFormula></saw:column>",
     "<saw:column xsi:type='saw:savedRegularColumnRef' columnID='saved-1' ",
-    "path='", saved_column_path, "'/>",
+    "path='", saved_column_path, "'><saw:columnHeading><saw:caption>",
+    "<saw:text>Short report heading</saw:text></saw:caption></saw:columnHeading>",
+    "</saw:column>",
     "</saw:columns>",
     "<saw:filter><sawx:expr xsi:type='sawx:logical' op='and'>",
     "<sawx:expr xsi:type='sawx:comparison' op='equal'>",
@@ -37,7 +39,16 @@ testthat::test_that("report columns, filters, and dependencies include inline an
     object_kind = c("report", "saved_column", "filter"),
     object_title = c("Test Report", "Test Saved Column", "Test Saved Filter"),
     original_path = c(report_path, saved_column_path, saved_filter_path),
-    xml_text = c(report_xml, "<savedColumnObject/>", "<savedFilterObject/>"),
+    xml_text = c(
+      report_xml,
+      paste0(
+        "<savedColumnObject xmlns:saw='com.siebel.analytics.web/report/v1.1'>",
+        "<saw:column><saw:columnHeading><saw:caption>",
+        "<saw:text>Canonical saved heading</saw:text>",
+        "</saw:caption></saw:columnHeading></saw:column></savedColumnObject>"
+      ),
+      "<savedFilterObject/>"
+    ),
     stringsAsFactors = FALSE
   )
   input_path <- tempfile(fileext = ".rds")
@@ -64,6 +75,10 @@ testthat::test_that("report columns, filters, and dependencies include inline an
   testthat::expect_equal(nrow(columns), 2L)
   testthat::expect_setequal(columns$column_source, c("inline", "saved_reference"))
   testthat::expect_equal(columns$report_subject_area, rep("Physical Items", 2L))
+  saved_row <- columns[columns$column_source == "saved_reference", ]
+  testthat::expect_equal(saved_row$column_name, "Canonical saved heading")
+  testthat::expect_equal(saved_row$report_display_name, "Short report heading")
+  testthat::expect_equal(saved_row$saved_column_name, "Test Saved Column")
   testthat::expect_equal(nrow(filters), 2L)
   testthat::expect_setequal(filters$filter_source, c("inline", "saved_reference"))
   testthat::expect_match(filters$filter_text[filters$filter_source == "inline"], "MAIN")

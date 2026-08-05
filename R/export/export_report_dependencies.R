@@ -21,7 +21,7 @@ export_report_dependencies <- function(
     columns$column_source == "saved_reference" &
       !is.na(columns$saved_column_path) & nzchar(columns$saved_column_path),
     c("report_catalog_index", "report_title", "report_path", "column_index",
-      "display_name", "saved_column_path"),
+      "column_name", "saved_column_path"),
     drop = FALSE
   ]
   if (nrow(column_dependencies)) {
@@ -31,7 +31,7 @@ export_report_dependencies <- function(
       report_path = column_dependencies$report_path,
       dependency_type = "saved_column",
       source_index = column_dependencies$column_index,
-      dependency_name = column_dependencies$display_name,
+      dependency_name = column_dependencies$column_name,
       dependency_path = column_dependencies$saved_column_path,
       stringsAsFactors = FALSE
     )
