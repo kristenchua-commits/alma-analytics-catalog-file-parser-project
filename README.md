@@ -12,10 +12,10 @@ writes spreadsheet-friendly CSV files without the large `xml_text` column.
 - [`docs/notebooks/campus_documentation_construction.ipynb`](docs/notebooks/campus_documentation_construction.ipynb)
   validates the reviewed normalized workbook, previews campus output names,
   and publishes the campus exclusions-documentation workbooks.
-- [`docs/notebooks/catalog_file_xml_structure.ipynb`](docs/notebooks/catalog_file_xml_structure.ipynb)
-  is a collapsible view of the XML tag hierarchy in the current example
-  `.catalog` file. Its R cell regenerates the tree from current pipeline
-  outputs.
+- [`documentation/notebooks/catalog_file_xml_and_object_structure.ipynb`](documentation/notebooks/catalog_file_xml_and_object_structure.ipynb)
+  shows both the catalog object hierarchy and a collapsible view of the XML tag
+  hierarchy in the current example `.catalog` file. Its R cells regenerate the
+  diagrams from current pipeline outputs.
 
 ## Requirements
 
@@ -60,6 +60,36 @@ processing scripts, yellow identifies intermediate datasets, purple identifies
 human-facing review outputs, and gray identifies inspection or detailed
 technical outputs. The separately reviewed publication workflow is documented
 below.
+
+### Catalog object tree
+
+Create a searchable, collapsible tree of the catalog folders and objects in
+`catalog_extract_summary.csv` with:
+
+```sh
+Rscript scripts/render_catalog_object_tree.R
+```
+
+The standalone HTML diagram is written to `output/catalog_object_tree.html`.
+It uses each object's slash-delimited `original_path` to derive folder
+containment, and color-codes object leaves by `object_kind`. No additional R
+packages are required. An alternate input CSV, output HTML path, and initial
+open depth can be supplied as positional arguments:
+
+```sh
+Rscript scripts/render_catalog_object_tree.R \
+  output/catalog_extract_summary.csv \
+  output/catalog_object_tree.html \
+  6 \
+  documentation/images/catalog_object_tree.png
+```
+
+The optional fourth argument writes a high-resolution static PNG for notebooks
+and other documentation.
+
+The summary CSV does not record runtime dependencies or references between
+objects, so the diagram represents catalog containment rather than data-flow
+dependencies.
 
 `scripts/choose_catalog_file_and_run_pipeline.R` is an optional interactive
 entry point. It selects a `.catalog` file and passes it to
