@@ -22,10 +22,14 @@ pipeline_files <- c(
   "R/extract/extract_catalog.R",
   "R/inspect/inspect_catalog_metadata.R",
   "R/extract/extract_xml_tag_inventory.R",
+  "R/extract/report_xml_helpers.R",
+  "R/extract/extract_report_columns.R",
+  "R/extract/extract_report_filters.R",
   "R/extract/extract_saved_columns.R",
   "R/extract/extract_filter_objects.R",
   "R/export/export_filter_criteria.R",
   "R/export/export_filter_review.R",
+  "R/export/export_report_dependencies.R",
   "R/export/export_saved_column_review.R"
 )
 for (pipeline_file in pipeline_files) {
@@ -57,6 +61,21 @@ run_parsing_pipeline <- function(
   )
 
   catalog <- readRDS(catalog_rds)
+  if (any(catalog$object_kind == "report")) {
+    report_columns_path <- file.path(output_dir, "report_columns.csv")
+    report_filters_path <- file.path(output_dir, "report_filters.csv")
+    report_columns <- extract_report_columns(catalog_rds, report_columns_path)
+    report_filters <- extract_report_filters(catalog_rds, report_filters_path)
+    export_report_dependencies(
+      catalog_rds,
+      report_columns,
+      report_filters,
+      file.path(output_dir, "report_dependencies.csv")
+    )
+  } else {
+    message("No report objects; skipping report structure outputs")
+  }
+
   if (any(catalog$object_kind == "saved_column")) {
     extract_saved_columns(catalog_rds, file.path(output_dir, "saved_columns.csv"))
     export_saved_column_review(

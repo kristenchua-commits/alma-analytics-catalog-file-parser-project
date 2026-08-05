@@ -123,6 +123,7 @@ because it does not feed the report builder.
 | Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_parsing_pipeline.R`; `R/choose_catalog_file.R`; `R/run_parsing_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
 | Shared catalog extraction | `R/extract/extract_catalog.R`; `R/io/read_catalog_file.R`; `R/io/read_catalog_metadata.R` | `.catalog` file | `catalog_extract.rds`; `catalog_extract_summary.csv` |
 | Metadata and XML-tag inspection | `R/inspect/inspect_catalog_metadata.R`; `R/extract/extract_xml_tag_inventory.R` | `catalog_extract.rds` | `catalog_metadata_inventory.csv`; `xml_tag_inventory.csv` |
+| Report structure extraction | `R/extract/extract_report_columns.R`; `R/extract/extract_report_filters.R`; `R/export/export_report_dependencies.R` | Report rows and XML in `catalog_extract.rds` | `report_columns.csv`; `report_filters.csv`; `report_dependencies.csv` |
 | Saved-column parsing and review | `R/extract/extract_saved_columns.R`; `R/export/export_saved_column_review.R` | Saved-column rows in `catalog_extract.rds` | `saved_columns.csv`; `saved_column_review.xlsx`; `saved_column_review.csv` |
 | Filter-object selection | `R/extract/extract_filter_objects.R` | Filter rows in `catalog_extract.rds` | `filter_objects.rds`; `filter_objects_summary.csv` |
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
@@ -146,15 +147,37 @@ aligns object name, path, kind, signature, ownership, and timestamps to those
 rows. Folder-only catalog metadata is intentionally excluded.
 
 `catalog_extract.rds` is the shared foundation for every downstream branch.
-Reports, dashboards, dashboard pages, and unrecognized objects remain available
-in this file and in `catalog_extract_summary.csv`, even though they do not have
-separate exporters.
+Dashboards, dashboard pages, and unrecognized objects remain available in this
+file and in `catalog_extract_summary.csv`. Reports additionally feed the report
+structure branch described below.
 
 ### Inspection branch
 
 `R/inspect/inspect_catalog_metadata.R` and
 `R/extract/extract_xml_tag_inventory.R` read `catalog_extract.rds` and create
 the metadata-pattern and XML-tag inventories.
+
+### Report structure branch
+
+When the catalog contains `report` objects, the orchestrator extracts every
+column and logical filter term embedded in each report's criteria XML. This
+includes definitions that were never saved as standalone catalog objects.
+
+`report_columns.csv` contains one row per selected report column. Its
+`column_source` distinguishes inline formulas from `saved_reference` columns;
+saved references retain their full catalog path. Binned inline columns retain
+their base formula, expression type, and rule count.
+
+`report_filters.csv` contains one row per logical leaf term. It records the
+logical join, expression type, operator, field, formatted filter text, and
+whether the term is inline or a saved-filter reference. Large value lists are
+represented by a complete `value_count` and a ten-value preview so CSV cells
+remain manageable; the original XML remains in `catalog_extract.rds`.
+
+`report_dependencies.csv` is the simplified relationship export. It contains
+one row per distinct report-to-saved-column or report-to-saved-filter path and
+indicates whether that target resolves to an object contained in the same
+catalog extract.
 
 ### Saved-column branch
 
@@ -179,8 +202,8 @@ row per expression-tree node, with parent/depth fields that preserve logical
 structure. The review exporter creates concise business-rule rows and retains
 large `IN`/`NOT IN` lists in a companion CSV.
 
-The saved-column and filter branches are conditional: a branch is skipped when
-the corresponding object type is absent.
+The report, saved-column, and filter branches are conditional: a branch is
+skipped when the corresponding object type is absent.
 
 ### Reviewed publication workflow
 
@@ -247,6 +270,9 @@ Campus documentation filenames use this pattern:
 | `catalog_extract_summary.csv` | Object names, paths, kinds, and metadata |
 | `catalog_metadata_inventory.csv` | Counts and missing-field checks by object pattern |
 | `xml_tag_inventory.csv` | XML tags, paths, depths, attributes, and values |
+| `report_columns.csv` | Every report-selected column, including inline formulas and saved-column references |
+| `report_filters.csv` | Every report filter term, including inline conditions and saved-filter references |
+| `report_dependencies.csv` | Distinct report-to-saved-column/filter paths with target-resolution status |
 | `saved_columns.csv` | Parsed saved-column definitions |
 | `saved_column_review.xlsx` | Saved-column business rules in the shared review schema, plus an object index |
 | `saved_column_review.csv` | CSV version of the saved-column rules in the shared review schema |
@@ -287,17 +313,20 @@ Rscript tests/testthat.R
 ```
 
 The test executes the complete filter branch in a temporary directory, checks
-its expected files, and verifies that saved-column outputs are skipped. It uses
-`testthat` when installed and otherwise runs equivalent assertions with base R.
-It does not currently test saved-column rule content, the manually normalized
-workbook, or the campus exclusions-documentation exporter.
+its expected files, and verifies that report and saved-column outputs are
+skipped. A synthetic report fixture separately verifies inline columns, saved
+column references, inline filter terms, saved filter references, and resolved
+dependencies. The suite uses `testthat` when installed and otherwise runs
+equivalent assertions with base R. It does not currently test saved-column rule
+content, the manually normalized workbook, or the campus exclusions-documentation
+exporter.
 
 ## Repository layout
 
 | Directory | Purpose |
 | --- | --- |
 | `R/io/` | Catalog readers and metadata alignment |
-| `R/extract/` | Catalog, saved-column, filter-object, and XML-tag extraction |
+| `R/extract/` | Catalog, report-column/filter, saved-column, filter-object, and XML-tag extraction |
 | `R/inspect/` | Metadata inspection |
 | `R/export/` | Review and detailed exports |
 | `scripts/` | Command-line and interactive parser entry points, diagram rendering, and campus documentation publication |
