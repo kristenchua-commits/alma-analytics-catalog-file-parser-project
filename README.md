@@ -85,7 +85,10 @@ Rscript scripts/render_catalog_object_tree.R \
 ```
 
 The optional fourth argument writes a high-resolution static PNG for notebooks
-and other documentation.
+and other documentation. When the corresponding `catalog_extract.rds` is
+available, the PNG also parses its XML and adds dashed relationship branches
+from preparation-review dashboards to their dashboard pages and referenced
+Electronic, Fulfillment, and Physical reports.
 
 The summary CSV does not record runtime dependencies or references between
 objects, so the diagram represents catalog containment rather than data-flow

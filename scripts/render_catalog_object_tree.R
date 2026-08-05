@@ -269,9 +269,115 @@ render_catalog_object_tree <- function(
   invisible(normalizePath(output_html, mustWork = FALSE))
 }
 
+add_preparation_dashboard_relationships <- function(nodes, catalog_rds) {
+  if (!file.exists(catalog_rds)) return(nodes)
+  if (!requireNamespace("xml2", quietly = TRUE)) {
+    warning("Package 'xml2' is unavailable; omitting dashboard references")
+    return(nodes)
+  }
+
+  catalog <- readRDS(catalog_rds)
+  required <- c("object_kind", "original_path", "xml_text")
+  if (!all(required %in% names(catalog))) {
+    warning("Catalog RDS lacks fields needed for dashboard references")
+    return(nodes)
+  }
+  catalog$original_path <- normalize_catalog_path(catalog$original_path)
+  prep_dashboards <- which(
+    catalog$object_kind == "dashboard" &
+      grepl(
+        "/Preparation review reports/UC[^/]+ preparation review reports dashboard/",
+        catalog$original_path
+      )
+  )
+  if (!length(prep_dashboards)) return(nodes)
+
+  object_node_id <- function(path, kind) {
+    matches <- which(
+      nodes$node_type == "object" & nodes$path == path & nodes$kind == kind
+    )
+    if (length(matches)) nodes$id[[matches[[1L]]]] else NA_character_
+  }
+  resolve_reference <- function(source_path, reference_path) {
+    if (startsWith(reference_path, "/")) {
+      normalize_catalog_path(reference_path)
+    } else {
+      normalize_catalog_path(file.path(dirname(source_path), reference_path))
+    }
+  }
+
+  reference_nodes <- list()
+  reference_index <- 0L
+  for (dashboard_row in prep_dashboards) {
+    dashboard_path <- catalog$original_path[[dashboard_row]]
+    dashboard_id <- object_node_id(dashboard_path, "dashboard")
+    if (is.na(dashboard_id)) next
+    dashboard_xml <- xml2::read_xml(catalog$xml_text[[dashboard_row]])
+    page_refs <- xml2::xml_find_all(
+      dashboard_xml,
+      ".//*[local-name()='dashboardPageRef']"
+    )
+
+    for (page_ref in page_refs) {
+      page_path <- resolve_reference(
+        dashboard_path,
+        xml2::xml_attr(page_ref, "path")
+      )
+      page_id <- object_node_id(page_path, "dashboard_page")
+      if (is.na(page_id)) next
+
+      # For the relationship view, the explicit dashboardPageRef becomes the
+      # page's semantic parent instead of its catalog storage folder.
+      nodes$parent[nodes$id == page_id] <- dashboard_id
+      page_row <- match(page_path, catalog$original_path)
+      if (is.na(page_row)) next
+      page_xml <- xml2::read_xml(catalog$xml_text[[page_row]])
+      report_refs <- xml2::xml_find_all(
+        page_xml,
+        ".//*[local-name()='reportRef']"
+      )
+
+      for (report_ref in report_refs) {
+        report_path <- resolve_reference(
+          page_path,
+          xml2::xml_attr(report_ref, "path")
+        )
+        report_row <- match(report_path, catalog$original_path)
+        if (is.na(report_row) || catalog$object_kind[[report_row]] != "report") {
+          next
+        }
+        reference_index <- reference_index + 1L
+        source_group <- sub(
+          " preparation review reports$",
+          "",
+          basename(dirname(report_path)),
+          ignore.case = TRUE
+        )
+        reference_nodes[[reference_index]] <- data.frame(
+          id = paste0("report-reference:", reference_index),
+          parent = page_id,
+          label = paste0(basename(report_path), " — ", source_group),
+          node_type = "reference",
+          kind = "report_reference",
+          path = report_path,
+          row_index = report_row,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+
+  if (length(reference_nodes)) {
+    nodes <- rbind(nodes, do.call(rbind, reference_nodes))
+    rownames(nodes) <- NULL
+  }
+  nodes
+}
+
 render_catalog_object_tree_png <- function(
     input_csv = "output/catalog_extract_summary.csv",
     output_png = "documentation/images/catalog_object_tree.png",
+    catalog_rds = sub("_summary[.]csv$", ".rds", input_csv),
     width = 14,
     row_height = 0.20,
     resolution = 140) {
@@ -309,12 +415,20 @@ render_catalog_object_tree_png <- function(
     common_depth <- 0L
   }
 
+  nodes <- add_preparation_dashboard_relationships(nodes, catalog_rds)
+
   path_depth <- function(path) {
     if (identical(path, "/")) return(0L)
     length(catalog_path_parts(path))
   }
   nodes$depth <- vapply(nodes$path, path_depth, integer(1L)) - common_depth
   nodes$depth[nodes$id == root_id] <- 0L
+  reference_rows <- nodes$node_type == "reference"
+  if (any(reference_rows)) {
+    depth_by_id <- stats::setNames(nodes$depth, nodes$id)
+    nodes$depth[reference_rows] <-
+      depth_by_id[nodes$parent[reference_rows]] + 1L
+  }
   children_by_parent <- split(nodes$id[!is.na(nodes$parent)],
                               nodes$parent[!is.na(nodes$parent)])
   node_by_id <- split(nodes, nodes$id)
@@ -346,7 +460,10 @@ render_catalog_object_tree_png <- function(
   node_y <- stats::setNames(rev(seq_len(nrow(nodes))), nodes$id)
   level_gap <- 3.4
   node_x <- stats::setNames(nodes$depth * level_gap, nodes$id)
-  object_nodes <- nodes[nodes$node_type == "object", , drop = FALSE]
+  object_nodes <- nodes[
+    nodes$node_type %in% c("object", "reference"),
+    , drop = FALSE
+  ]
 
   palette <- c(
     report = "#2F80C9",
@@ -354,6 +471,7 @@ render_catalog_object_tree_png <- function(
     dashboard_page = "#A66BC7",
     saved_column = "#319B5D",
     filter = "#D49B18",
+    report_reference = "#16838B",
     unknown = "#6B778C"
   )
   object_colors <- unname(palette[object_nodes$kind])
@@ -387,17 +505,22 @@ render_catalog_object_tree_png <- function(
     child_x <- node_x[child_ids]
     child_y <- node_y[child_ids]
     branch_x <- min(child_x) - 0.48
+    parent_kind <- node_by_id[[parent_id]]$kind[[1L]]
+    relationship_branch <- parent_kind %in% c("dashboard", "dashboard_page")
+    branch_color <- if (relationship_branch) "#16838B" else "#AEB8C5"
+    branch_lty <- if (relationship_branch) 2 else 1
     graphics::segments(parent_x, parent_y, branch_x, parent_y,
-                       col = "#AEB8C5", lwd = 0.9)
+                       col = branch_color, lwd = 0.9, lty = branch_lty)
     if (length(child_ids) > 1L) {
       graphics::segments(branch_x, min(child_y), branch_x, max(child_y),
-                         col = "#AEB8C5", lwd = 0.9)
+                         col = branch_color, lwd = 0.9, lty = branch_lty)
     }
     graphics::segments(branch_x, child_y, child_x, child_y,
-                       col = "#AEB8C5", lwd = 0.9)
+                       col = branch_color, lwd = 0.9, lty = branch_lty)
   }
 
-  folder_nodes <- nodes[nodes$node_type != "object", , drop = FALSE]
+  folder_nodes <- nodes[nodes$node_type %in% c("folder", "root"),
+                        , drop = FALSE]
   graphics::points(
     node_x[folder_nodes$id],
     node_y[folder_nodes$id],
@@ -439,7 +562,13 @@ render_catalog_object_tree_png <- function(
     col = "#172B4D"
   )
   graphics::mtext(
-    paste0(nrow(catalog), " objects grouped by folder beneath ", common_path),
+    paste0(
+      nrow(catalog), " objects grouped by folder beneath ", common_path,
+      if (any(reference_rows)) {
+        paste0("; ", sum(reference_rows),
+               " preparation-dashboard report references shown in teal")
+      } else ""
+    ),
     side = 3,
     line = 0.8,
     cex = 0.68,
