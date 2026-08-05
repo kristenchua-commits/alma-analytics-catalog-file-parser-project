@@ -85,16 +85,16 @@ Rscript scripts/render_catalog_object_tree.R \
 ```
 
 The optional fourth argument writes a high-resolution static PNG for notebooks
-and other documentation. When the corresponding `catalog_extract.rds` is
-available, the PNG also parses its XML and adds dashed relationship branches
-from preparation-review dashboards to their dashboard pages and referenced
-Electronic, Fulfillment, and Physical reports. The same command also writes
+and other documentation. To remain readable, this overview preserves the full
+folder hierarchy but aggregates the 308 individual objects by `object_kind`
+within each folder. The searchable HTML retains every object name. When the
+corresponding `catalog_extract.rds` is available, the same command also writes
 `documentation/images/preparation_review_dashboard_relationships.png`, a
-focused three-column view of those dashboard-to-page-to-report relationships.
+focused three-column view derived from the explicit dashboard-to-page-to-report
+XML relationships.
 
-The summary CSV does not record runtime dependencies or references between
-objects, so the diagram represents catalog containment rather than data-flow
-dependencies.
+The summary CSV records catalog containment but not object references. The
+focused dashboard diagram reads those references from `catalog_extract.rds`.
 
 `scripts/choose_catalog_file_and_run_pipeline.R` is an optional interactive
 entry point. It selects a `.catalog` file and passes it to

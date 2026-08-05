@@ -585,10 +585,37 @@ render_preparation_dashboard_relationships_png <- function(
   invisible(normalizePath(output_png, mustWork = FALSE))
 }
 
+collapse_objects_for_tree_overview <- function(nodes) {
+  objects <- nodes[nodes$node_type == "object", , drop = FALSE]
+  folders <- nodes[nodes$node_type != "object", , drop = FALSE]
+  if (!nrow(objects)) return(nodes)
+
+  group_key <- paste(objects$parent, objects$kind, sep = "\r")
+  object_groups <- split(objects, group_key)
+  summaries <- lapply(seq_along(object_groups), function(i) {
+    group <- object_groups[[i]]
+    count <- nrow(group)
+    data.frame(
+      id = paste0("object-summary:", i),
+      parent = group$parent[[1L]],
+      label = paste0(
+        group$kind[[1L]], " — ", count, " object", if (count == 1L) "" else "s"
+      ),
+      node_type = "summary",
+      kind = group$kind[[1L]],
+      path = group$path[[1L]],
+      row_index = NA_integer_,
+      stringsAsFactors = FALSE
+    )
+  })
+  collapsed <- rbind(folders, do.call(rbind, summaries))
+  rownames(collapsed) <- NULL
+  collapsed
+}
+
 render_catalog_object_tree_png <- function(
     input_csv = "output/catalog_extract_summary.csv",
     output_png = "documentation/images/catalog_object_tree.png",
-    catalog_rds = sub("_summary[.]csv$", ".rds", input_csv),
     width = 22,
     row_height = 0.20,
     resolution = 140) {
@@ -626,7 +653,7 @@ render_catalog_object_tree_png <- function(
     common_depth <- 0L
   }
 
-  nodes <- add_preparation_dashboard_relationships(nodes, catalog_rds)
+  nodes <- collapse_objects_for_tree_overview(nodes)
 
   path_depth <- function(path) {
     if (identical(path, "/")) return(0L)
@@ -634,11 +661,11 @@ render_catalog_object_tree_png <- function(
   }
   nodes$depth <- vapply(nodes$path, path_depth, integer(1L)) - common_depth
   nodes$depth[nodes$id == root_id] <- 0L
-  reference_rows <- nodes$node_type == "reference"
-  if (any(reference_rows)) {
+  summary_rows <- nodes$node_type == "summary"
+  if (any(summary_rows)) {
     depth_by_id <- stats::setNames(nodes$depth, nodes$id)
-    nodes$depth[reference_rows] <-
-      depth_by_id[nodes$parent[reference_rows]] + 1L
+    nodes$depth[summary_rows] <-
+      depth_by_id[nodes$parent[summary_rows]] + 1L
   }
   children_by_parent <- split(nodes$id[!is.na(nodes$parent)],
                               nodes$parent[!is.na(nodes$parent)])
@@ -651,7 +678,7 @@ render_catalog_object_tree_png <- function(
       node_by_id[[child_id]][1L, , drop = FALSE]
     })
     folder_first <- vapply(child_nodes, function(child) {
-      child$node_type == "object"
+      child$node_type %in% c("object", "reference", "summary")
     }, logical(1L))
     labels <- vapply(child_nodes, function(child) tolower(child$label),
                      character(1L))
@@ -671,10 +698,7 @@ render_catalog_object_tree_png <- function(
   node_y <- stats::setNames(rev(seq_len(nrow(nodes))), nodes$id)
   level_gap <- 6.5
   node_x <- stats::setNames(nodes$depth * level_gap, nodes$id)
-  object_nodes <- nodes[
-    nodes$node_type %in% c("object", "reference"),
-    , drop = FALSE
-  ]
+  object_nodes <- nodes[nodes$node_type == "summary", , drop = FALSE]
 
   palette <- c(
     report = "#2F80C9",
@@ -682,7 +706,6 @@ render_catalog_object_tree_png <- function(
     dashboard_page = "#A66BC7",
     saved_column = "#319B5D",
     filter = "#D49B18",
-    report_reference = "#16838B",
     unknown = "#6B778C"
   )
   object_colors <- unname(palette[object_nodes$kind])
@@ -717,9 +740,8 @@ render_catalog_object_tree_png <- function(
     child_y <- node_y[child_ids]
     branch_x <- min(child_x) - 0.48
     parent_kind <- node_by_id[[parent_id]]$kind[[1L]]
-    relationship_branch <- parent_kind %in% c("dashboard", "dashboard_page")
-    branch_color <- if (relationship_branch) "#16838B" else "#AEB8C5"
-    branch_lty <- if (relationship_branch) 2 else 1
+    branch_color <- "#AEB8C5"
+    branch_lty <- 1
     graphics::segments(parent_x, parent_y, branch_x, parent_y,
                        col = branch_color, lwd = 0.9, lty = branch_lty)
     if (length(child_ids) > 1L) {
@@ -765,7 +787,7 @@ render_catalog_object_tree_png <- function(
   )
 
   graphics::mtext(
-    "Alma Analytics Catalog Object Structure",
+    "Alma Analytics Catalog Object Tree Overview",
     side = 3,
     line = 2.1,
     font = 2,
@@ -774,11 +796,8 @@ render_catalog_object_tree_png <- function(
   )
   graphics::mtext(
     paste0(
-      nrow(catalog), " objects grouped by folder beneath ", common_path,
-      if (any(reference_rows)) {
-        paste0("; ", sum(reference_rows),
-               " preparation-dashboard report references shown in teal")
-      } else ""
+      nrow(catalog), " objects summarized by type within folders beneath ",
+      common_path
     ),
     side = 3,
     line = 0.8,
