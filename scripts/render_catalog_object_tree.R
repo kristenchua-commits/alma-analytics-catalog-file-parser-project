@@ -317,28 +317,36 @@ render_catalog_object_tree_png <- function(
   nodes$depth[nodes$id == root_id] <- 0L
   children_by_parent <- split(nodes$id[!is.na(nodes$parent)],
                               nodes$parent[!is.na(nodes$parent)])
+  node_by_id <- split(nodes, nodes$id)
 
-  object_nodes <- nodes[nodes$node_type == "object", , drop = FALSE]
-  object_nodes <- object_nodes[order(object_nodes$path, object_nodes$kind,
-                                     object_nodes$label), , drop = FALSE]
-  node_y <- stats::setNames(rep(NA_real_, nrow(nodes)), nodes$id)
-  node_y[object_nodes$id] <- rev(seq_len(nrow(object_nodes)))
-
-  unresolved <- nodes$id[is.na(node_y)]
-  while (length(unresolved)) {
-    resolved_this_pass <- character()
-    for (id in unresolved) {
-      child_ids <- children_by_parent[[id]]
-      if (length(child_ids) && all(!is.na(node_y[child_ids]))) {
-        node_y[[id]] <- mean(range(node_y[child_ids]))
-        resolved_this_pass <- c(resolved_this_pass, id)
-      }
-    }
-    if (!length(resolved_this_pass)) {
-      stop("Could not resolve vertical positions for all tree nodes")
-    }
-    unresolved <- setdiff(unresolved, resolved_this_pass)
+  ordered_children <- function(id) {
+    child_ids <- children_by_parent[[id]]
+    if (!length(child_ids)) return(character())
+    child_nodes <- lapply(child_ids, function(child_id) {
+      node_by_id[[child_id]][1L, , drop = FALSE]
+    })
+    folder_first <- vapply(child_nodes, function(child) {
+      child$node_type == "object"
+    }, logical(1L))
+    labels <- vapply(child_nodes, function(child) tolower(child$label),
+                     character(1L))
+    child_ids[order(folder_first, labels)]
   }
+
+  preorder <- function(id) {
+    child_ids <- ordered_children(id)
+    c(id, unlist(lapply(child_ids, preorder), use.names = FALSE))
+  }
+  draw_order <- preorder(root_id)
+  if (!setequal(draw_order, nodes$id)) {
+    stop("The display tree does not contain every catalog node")
+  }
+  nodes <- nodes[match(draw_order, nodes$id), , drop = FALSE]
+  node_by_id <- split(nodes, nodes$id)
+  node_y <- stats::setNames(rev(seq_len(nrow(nodes))), nodes$id)
+  level_gap <- 3.4
+  node_x <- stats::setNames(nodes$depth * level_gap, nodes$id)
+  object_nodes <- nodes[nodes$node_type == "object", , drop = FALSE]
 
   palette <- c(
     report = "#2F80C9",
@@ -350,7 +358,7 @@ render_catalog_object_tree_png <- function(
   )
   object_colors <- unname(palette[object_nodes$kind])
   object_colors[is.na(object_colors)] <- palette[["unknown"]]
-  image_height <- max(12, nrow(object_nodes) * row_height)
+  image_height <- max(12, nrow(nodes) * row_height)
   dir.create(dirname(output_png), recursive = TRUE, showWarnings = FALSE)
   grDevices::png(
     output_png,
@@ -362,40 +370,44 @@ render_catalog_object_tree_png <- function(
   )
   on.exit(grDevices::dev.off(), add = TRUE)
   graphics::par(mar = c(1.2, 0.8, 3.5, 0.8), family = "sans", xpd = NA)
-  max_depth <- max(nodes$depth)
+  max_x <- max(node_x)
   graphics::plot.new()
   graphics::plot.window(
-    xlim = c(-0.2, max_depth + 2.5),
-    ylim = c(0.3, nrow(object_nodes) + 0.7)
+    xlim = c(-0.2, max_x + 5.2),
+    ylim = c(0.3, nrow(nodes) + 0.7)
   )
 
-  for (i in seq_len(nrow(nodes))) {
-    if (is.na(nodes$parent[[i]])) next
-    parent_index <- match(nodes$parent[[i]], nodes$id)
-    parent_x <- nodes$depth[[parent_index]]
-    parent_y <- node_y[[nodes$parent[[i]]]]
-    child_x <- nodes$depth[[i]]
-    child_y <- node_y[[nodes$id[[i]]]]
-    elbow_x <- parent_x + 0.45
-    graphics::segments(parent_x, parent_y, elbow_x, parent_y,
-                       col = "#B8C0CC", lwd = 0.8)
-    graphics::segments(elbow_x, parent_y, elbow_x, child_y,
-                       col = "#B8C0CC", lwd = 0.8)
-    graphics::segments(elbow_x, child_y, child_x, child_y,
-                       col = "#B8C0CC", lwd = 0.8)
+  parent_ids <- nodes$id[vapply(nodes$id, function(id) {
+    length(children_by_parent[[id]]) > 0L
+  }, logical(1L))]
+  for (parent_id in parent_ids) {
+    child_ids <- ordered_children(parent_id)
+    parent_x <- node_x[[parent_id]]
+    parent_y <- node_y[[parent_id]]
+    child_x <- node_x[child_ids]
+    child_y <- node_y[child_ids]
+    branch_x <- min(child_x) - 0.48
+    graphics::segments(parent_x, parent_y, branch_x, parent_y,
+                       col = "#AEB8C5", lwd = 0.9)
+    if (length(child_ids) > 1L) {
+      graphics::segments(branch_x, min(child_y), branch_x, max(child_y),
+                         col = "#AEB8C5", lwd = 0.9)
+    }
+    graphics::segments(branch_x, child_y, child_x, child_y,
+                       col = "#AEB8C5", lwd = 0.9)
   }
 
   folder_nodes <- nodes[nodes$node_type != "object", , drop = FALSE]
   graphics::points(
-    folder_nodes$depth,
+    node_x[folder_nodes$id],
     node_y[folder_nodes$id],
     pch = 15,
     cex = 0.65,
     col = "#D99A16"
   )
   graphics::text(
-    folder_nodes$depth + 0.10,
-    node_y[folder_nodes$id] + 0.30,
+    node_x[folder_nodes$id] + 0.12,
+    node_y[folder_nodes$id] + 0.28,
     labels = folder_nodes$label,
     adj = c(0, 0.5),
     cex = 0.58,
@@ -403,14 +415,14 @@ render_catalog_object_tree_png <- function(
     col = "#5C430C"
   )
   graphics::points(
-    object_nodes$depth,
+    node_x[object_nodes$id],
     node_y[object_nodes$id],
     pch = 16,
     cex = 0.42,
     col = object_colors
   )
   graphics::text(
-    object_nodes$depth + 0.10,
+    node_x[object_nodes$id] + 0.12,
     node_y[object_nodes$id],
     labels = paste0(object_nodes$label, "  [", object_nodes$kind, "]"),
     adj = c(0, 0.5),
