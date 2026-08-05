@@ -374,11 +374,222 @@ add_preparation_dashboard_relationships <- function(nodes, catalog_rds) {
   nodes
 }
 
+extract_preparation_dashboard_relationships <- function(
+    input_csv = "output/catalog_extract_summary.csv",
+    catalog_rds = sub("_summary[.]csv$", ".rds", input_csv)) {
+  catalog <- utils::read.csv(
+    input_csv,
+    stringsAsFactors = FALSE,
+    check.names = FALSE,
+    na.strings = character()
+  )
+  nodes <- add_preparation_dashboard_relationships(
+    build_catalog_tree(catalog)$nodes,
+    catalog_rds
+  )
+  references <- nodes[nodes$node_type == "reference", , drop = FALSE]
+  if (!nrow(references)) return(data.frame())
+  node_by_id <- split(nodes, nodes$id)
+
+  rows <- lapply(seq_len(nrow(references)), function(i) {
+    reference <- references[i, , drop = FALSE]
+    page <- node_by_id[[reference$parent]][1L, , drop = FALSE]
+    dashboard <- node_by_id[[page$parent]][1L, , drop = FALSE]
+    source_group <- sub(
+      " preparation review reports$",
+      "",
+      basename(dirname(reference$path)),
+      ignore.case = TRUE
+    )
+    dashboard_folder <- basename(dirname(dashboard$path))
+    campus <- sub(" preparation review reports dashboard$", "",
+                  dashboard_folder, ignore.case = TRUE)
+    data.frame(
+      campus = campus,
+      dashboard = dashboard_folder,
+      dashboard_path = dashboard$path,
+      page = page$label,
+      page_path = page$path,
+      report = basename(reference$path),
+      report_path = reference$path,
+      source_group = source_group,
+      stringsAsFactors = FALSE
+    )
+  })
+  relationships <- do.call(rbind, rows)
+  source_order <- match(
+    relationships$source_group,
+    c("Electronic", "Fulfillment", "Physical")
+  )
+  page_order <- match(
+    relationships$page,
+    c(
+      "eResources - Library Categories",
+      "Fulfillment - Check-out Type",
+      "Fulfillment - User Group",
+      "Fulfillment - User Groups",
+      "Physical Items - Library Categories"
+    )
+  )
+  relationships[order(relationships$campus, source_order, page_order),
+                , drop = FALSE]
+}
+
+render_preparation_dashboard_relationships_png <- function(
+    input_csv = "output/catalog_extract_summary.csv",
+    output_png = "documentation/images/preparation_review_dashboard_relationships.png",
+    catalog_rds = sub("_summary[.]csv$", ".rds", input_csv),
+    width = 18,
+    height = 32,
+    resolution = 140) {
+  relationships <- extract_preparation_dashboard_relationships(
+    input_csv,
+    catalog_rds
+  )
+  if (!nrow(relationships)) {
+    stop("No preparation-review dashboard relationships were found")
+  }
+
+  campuses <- unique(relationships$campus)
+  counts <- table(relationships$campus)
+  if (any(counts != 4L)) {
+    stop("Expected four linked reports for every campus dashboard")
+  }
+  dir.create(dirname(output_png), recursive = TRUE, showWarnings = FALSE)
+  grDevices::png(
+    output_png,
+    width = width,
+    height = height,
+    units = "in",
+    res = resolution,
+    bg = "white"
+  )
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::par(mar = c(0.5, 0.5, 2.7, 0.5), family = "sans", xpd = NA)
+  graphics::plot.new()
+  block_height <- 5.25
+  top <- length(campuses) * block_height
+  graphics::plot.window(xlim = c(0, 18), ylim = c(0, top + 1.6))
+
+  dashboard_x <- 2.35
+  page_x <- 7.55
+  report_x <- 14.2
+  dashboard_width <- 3.9
+  page_width <- 4.25
+  report_width <- 6.0
+  box_height <- 0.72
+
+  draw_box <- function(x, y, box_width, box_height, label, fill,
+                       border = "#52606D", cex = 0.58, font = 1) {
+    graphics::rect(
+      x - box_width / 2,
+      y - box_height / 2,
+      x + box_width / 2,
+      y + box_height / 2,
+      col = fill,
+      border = border,
+      lwd = 1
+    )
+    lines <- strwrap(label, width = max(18L, floor(box_width * 11)))
+    line_step <- 0.20
+    start_y <- y + (length(lines) - 1L) * line_step / 2
+    graphics::text(
+      x,
+      start_y - (seq_along(lines) - 1L) * line_step,
+      labels = lines,
+      cex = cex,
+      font = font,
+      col = "#172B4D"
+    )
+  }
+
+  group_fill <- c(
+    Electronic = "#DCEBFA",
+    Fulfillment = "#FFF1CC",
+    Physical = "#DDF3E4"
+  )
+  for (campus_index in seq_along(campuses)) {
+    campus <- campuses[[campus_index]]
+    campus_rows <- relationships[relationships$campus == campus,
+                                 , drop = FALSE]
+    block_top <- top - (campus_index - 1L) * block_height
+    row_y <- block_top - c(0.85, 1.85, 2.85, 3.85)
+    dashboard_y <- mean(range(row_y))
+
+    if (campus_index %% 2L == 0L) {
+      graphics::rect(
+        0.15, block_top - 4.65, 17.85, block_top + 0.05,
+        col = "#F7F9FC", border = NA
+      )
+    }
+
+    # Draw connectors first so the opaque boxes always sit above the lines.
+    dashboard_right <- dashboard_x + dashboard_width / 2
+    page_left <- page_x - page_width / 2
+    page_right <- page_x + page_width / 2
+    report_left <- report_x - report_width / 2
+    branch_x <- page_left - 0.42
+    graphics::segments(
+      dashboard_right, dashboard_y, branch_x, dashboard_y,
+      col = "#16838B", lwd = 1.4
+    )
+    graphics::segments(
+      branch_x, min(row_y), branch_x, max(row_y),
+      col = "#16838B", lwd = 1.4
+    )
+    graphics::segments(
+      branch_x, row_y, page_left, row_y,
+      col = "#16838B", lwd = 1.4
+    )
+    graphics::arrows(
+      page_right, row_y, report_left, row_y,
+      length = 0.07, angle = 22, col = "#16838B", lwd = 1.2
+    )
+
+    draw_box(
+      dashboard_x, dashboard_y, dashboard_width, 1.05,
+      campus_rows$dashboard[[1L]], "#E7DDF5", cex = 0.61, font = 2
+    )
+    for (row_index in seq_len(4L)) {
+      relationship <- campus_rows[row_index, , drop = FALSE]
+      draw_box(
+        page_x, row_y[[row_index]], page_width, box_height,
+        relationship$page, "#F1E7FA", cex = 0.56
+      )
+      report_label <- paste0(
+        relationship$source_group, " report\n", relationship$report
+      )
+      draw_box(
+        report_x, row_y[[row_index]], report_width, box_height,
+        report_label, group_fill[[relationship$source_group]], cex = 0.53
+      )
+    }
+  }
+
+  header_y <- top + 0.65
+  graphics::text(dashboard_x, header_y, "Campus preparation-review dashboard",
+                 font = 2, cex = 0.78, col = "#172B4D")
+  graphics::text(page_x, header_y, "Dashboard pages",
+                 font = 2, cex = 0.78, col = "#172B4D")
+  graphics::text(report_x, header_y, "Referenced campus reports",
+                 font = 2, cex = 0.78, col = "#172B4D")
+  graphics::mtext(
+    "Campus Preparation-Review Dashboard Composition",
+    side = 3, line = 1.6, font = 2, cex = 1.25, col = "#172B4D"
+  )
+  graphics::mtext(
+    "Explicit sawd:dashboardPageRef and sawd:reportRef relationships from catalog_extract.rds",
+    side = 3, line = 0.45, cex = 0.72, col = "#6B778C"
+  )
+
+  invisible(normalizePath(output_png, mustWork = FALSE))
+}
+
 render_catalog_object_tree_png <- function(
     input_csv = "output/catalog_extract_summary.csv",
     output_png = "documentation/images/catalog_object_tree.png",
     catalog_rds = sub("_summary[.]csv$", ".rds", input_csv),
-    width = 14,
+    width = 22,
     row_height = 0.20,
     resolution = 140) {
   if (!file.exists(input_csv)) stop("Input CSV does not exist: ", input_csv)
@@ -458,7 +669,7 @@ render_catalog_object_tree_png <- function(
   nodes <- nodes[match(draw_order, nodes$id), , drop = FALSE]
   node_by_id <- split(nodes, nodes$id)
   node_y <- stats::setNames(rev(seq_len(nrow(nodes))), nodes$id)
-  level_gap <- 3.4
+  level_gap <- 6.5
   node_x <- stats::setNames(nodes$depth * level_gap, nodes$id)
   object_nodes <- nodes[
     nodes$node_type %in% c("object", "reference"),
@@ -491,7 +702,7 @@ render_catalog_object_tree_png <- function(
   max_x <- max(node_x)
   graphics::plot.new()
   graphics::plot.window(
-    xlim = c(-0.2, max_x + 5.2),
+    xlim = c(-0.2, max_x + 8.0),
     ylim = c(0.3, nrow(nodes) + 0.7)
   )
 
@@ -603,5 +814,14 @@ if (!interactive() && sys.nframe() == 0L) {
   if (length(args) >= 4L && nzchar(args[[4L]])) {
     image_path <- render_catalog_object_tree_png(input_csv, args[[4L]])
     message("Wrote ", image_path)
+    relationship_path <- file.path(
+      dirname(args[[4L]]),
+      "preparation_review_dashboard_relationships.png"
+    )
+    relationship_path <- render_preparation_dashboard_relationships_png(
+      input_csv,
+      relationship_path
+    )
+    message("Wrote ", relationship_path)
   }
 }

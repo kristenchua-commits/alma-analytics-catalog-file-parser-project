@@ -88,7 +88,9 @@ The optional fourth argument writes a high-resolution static PNG for notebooks
 and other documentation. When the corresponding `catalog_extract.rds` is
 available, the PNG also parses its XML and adds dashed relationship branches
 from preparation-review dashboards to their dashboard pages and referenced
-Electronic, Fulfillment, and Physical reports.
+Electronic, Fulfillment, and Physical reports. The same command also writes
+`documentation/images/preparation_review_dashboard_relationships.png`, a
+focused three-column view of those dashboard-to-page-to-report relationships.
 
 The summary CSV does not record runtime dependencies or references between
 objects, so the diagram represents catalog containment rather than data-flow
