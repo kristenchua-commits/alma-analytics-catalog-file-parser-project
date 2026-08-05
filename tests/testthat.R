@@ -29,8 +29,8 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     all(file.exists(file.path(output_dir, expected_files))),
     !file.exists(file.path(output_dir, "saved_columns.csv")),
     !file.exists(file.path(output_dir, "saved_column_review.xlsx")),
-    !file.exists(file.path(output_dir, "report_columns.csv")),
-    !file.exists(file.path(output_dir, "report_filters.csv")),
+    !file.exists(file.path(output_dir, "report_saved_and_non_saved_columns.csv")),
+    !file.exists(file.path(output_dir, "report_saved_and_non_saved_filters.csv")),
     !file.exists(file.path(output_dir, "report_dependencies.csv"))
   )
 
@@ -69,11 +69,11 @@ if (requireNamespace("testthat", quietly = TRUE)) {
   saveRDS(report_catalog, report_input)
   report_columns <- extract_report_columns(
     report_input,
-    file.path(report_output, "report_columns.csv")
+    file.path(report_output, "report_saved_and_non_saved_columns.csv")
   )
   report_filters <- extract_report_filters(
     report_input,
-    file.path(report_output, "report_filters.csv")
+    file.path(report_output, "report_saved_and_non_saved_filters.csv")
   )
   report_dependencies <- export_report_dependencies(
     report_input,

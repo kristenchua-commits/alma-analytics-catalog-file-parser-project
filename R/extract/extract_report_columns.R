@@ -1,7 +1,7 @@
 # Extract every selected column embedded in report criteria.
 extract_report_columns <- function(
     input_path = "output/catalog_extract.rds",
-    output_path = "output/report_columns.csv") {
+    output_path = "output/report_saved_and_non_saved_columns.csv") {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
   catalog <- readRDS(input_path)
@@ -105,6 +105,7 @@ extract_report_columns <- function(
   rownames(report_columns) <- NULL
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
   write.csv(report_columns, output_path, row.names = FALSE, na = "")
-  message("Wrote ", output_path, " (", nrow(report_columns), " report-column rows)")
+  message("Wrote ", output_path, " (", nrow(report_columns),
+          " saved and non-saved report-column rows)")
   invisible(report_columns)
 }

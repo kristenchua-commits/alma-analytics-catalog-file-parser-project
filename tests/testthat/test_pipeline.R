@@ -34,7 +34,11 @@ testthat::test_that("the filter fixture runs through the complete filter branch"
   testthat::expect_true(all(file.exists(file.path(output_dir, expected_files))))
   testthat::expect_false(file.exists(file.path(output_dir, "saved_columns.csv")))
   testthat::expect_false(file.exists(file.path(output_dir, "saved_column_review.xlsx")))
-  testthat::expect_false(file.exists(file.path(output_dir, "report_columns.csv")))
-  testthat::expect_false(file.exists(file.path(output_dir, "report_filters.csv")))
+  testthat::expect_false(file.exists(file.path(
+    output_dir, "report_saved_and_non_saved_columns.csv"
+  )))
+  testthat::expect_false(file.exists(file.path(
+    output_dir, "report_saved_and_non_saved_filters.csv"
+  )))
   testthat::expect_false(file.exists(file.path(output_dir, "report_dependencies.csv")))
 })

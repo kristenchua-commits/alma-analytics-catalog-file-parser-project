@@ -1,7 +1,7 @@
 # Extract logical leaf terms from filters embedded in report criteria.
 extract_report_filters <- function(
     input_path = "output/catalog_extract.rds",
-    output_path = "output/report_filters.csv",
+    output_path = "output/report_saved_and_non_saved_filters.csv",
     value_preview_limit = 10L) {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
@@ -100,6 +100,7 @@ extract_report_filters <- function(
   rownames(report_filters) <- NULL
   dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
   write.csv(report_filters, output_path, row.names = FALSE, na = "")
-  message("Wrote ", output_path, " (", nrow(report_filters), " report-filter rows)")
+  message("Wrote ", output_path, " (", nrow(report_filters),
+          " saved and non-saved report-filter rows)")
   invisible(report_filters)
 }

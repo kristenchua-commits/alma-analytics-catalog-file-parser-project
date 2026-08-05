@@ -123,7 +123,7 @@ because it does not feed the report builder.
 | Input selection and orchestration | `scripts/choose_catalog_file_and_run_pipeline.R`; `scripts/run_parsing_pipeline.R`; `R/choose_catalog_file.R`; `R/run_parsing_pipeline.R` | Raw Alma Analytics `.catalog` file | Starts shared extraction |
 | Shared catalog extraction | `R/extract/extract_catalog.R`; `R/io/read_catalog_file.R`; `R/io/read_catalog_metadata.R` | `.catalog` file | `catalog_extract.rds`; `catalog_extract_summary.csv` |
 | Metadata and XML-tag inspection | `R/inspect/inspect_catalog_metadata.R`; `R/extract/extract_xml_tag_inventory.R` | `catalog_extract.rds` | `catalog_metadata_inventory.csv`; `xml_tag_inventory.csv` |
-| Report structure extraction | `R/extract/extract_report_columns.R`; `R/extract/extract_report_filters.R`; `R/export/export_report_dependencies.R` | Report rows and XML in `catalog_extract.rds` | `report_columns.csv`; `report_filters.csv`; `report_dependencies.csv` |
+| Report structure extraction | `R/extract/extract_report_columns.R`; `R/extract/extract_report_filters.R`; `R/export/export_report_dependencies.R` | Report rows and XML in `catalog_extract.rds` | `report_saved_and_non_saved_columns.csv`; `report_saved_and_non_saved_filters.csv`; `report_dependencies.csv` |
 | Saved-column parsing and review | `R/extract/extract_saved_columns.R`; `R/export/export_saved_column_review.R` | Saved-column rows in `catalog_extract.rds` | `saved_columns.csv`; `saved_column_review.xlsx`; `saved_column_review.csv` |
 | Filter-object selection | `R/extract/extract_filter_objects.R` | Filter rows in `catalog_extract.rds` | `filter_objects.rds`; `filter_objects_summary.csv` |
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
@@ -163,16 +163,19 @@ When the catalog contains `report` objects, the orchestrator extracts every
 column and logical filter term embedded in each report's criteria XML. This
 includes definitions that were never saved as standalone catalog objects.
 
-`report_columns.csv` contains one row per selected report column. Its
-`column_source` distinguishes inline formulas from `saved_reference` columns;
-saved references retain their full catalog path. Binned inline columns retain
-their base formula, expression type, and rule count.
+`report_saved_and_non_saved_columns.csv` contains every report-selected column
+in one sheet. The `column_source` field distinguishes `inline` definitions from
+`saved_reference` rows. Saved references retain their full catalog path, while
+binned non-saved columns retain their base formula, expression type, and rule
+count.
 
-`report_filters.csv` contains one row per logical leaf term. It records the
-logical join, expression type, operator, field, formatted filter text, and
-whether the term is inline or a saved-filter reference. Large value lists are
-represented by a complete `value_count` and a ten-value preview so CSV cells
-remain manageable; the original XML remains in `catalog_extract.rds`.
+`report_saved_and_non_saved_filters.csv` contains every report filter term in
+one sheet. The `filter_source` field distinguishes `inline` terms from
+`saved_reference` rows. All rows retain their report context and logical join;
+non-saved filters also include expression type, operator, field, formatted
+text, and values. Large value lists are represented by a complete `value_count`
+and a ten-value preview so CSV cells remain manageable; the original XML
+remains in `catalog_extract.rds`.
 
 `report_dependencies.csv` is the simplified relationship export. It contains
 one row per distinct report-to-saved-column or report-to-saved-filter path and
@@ -270,8 +273,8 @@ Campus documentation filenames use this pattern:
 | `catalog_extract_summary.csv` | Object names, paths, kinds, and metadata |
 | `catalog_metadata_inventory.csv` | Counts and missing-field checks by object pattern |
 | `xml_tag_inventory.csv` | XML tags, paths, depths, attributes, and values |
-| `report_columns.csv` | Every report-selected column, including inline formulas and saved-column references |
-| `report_filters.csv` | Every report filter term, including inline conditions and saved-filter references |
+| `report_saved_and_non_saved_columns.csv` | All report-selected columns; `column_source` distinguishes non-saved definitions from saved-column references |
+| `report_saved_and_non_saved_filters.csv` | All report filter terms; `filter_source` distinguishes non-saved definitions from saved-filter references |
 | `report_dependencies.csv` | Distinct report-to-saved-column/filter paths with target-resolution status |
 | `saved_columns.csv` | Parsed saved-column definitions |
 | `saved_column_review.xlsx` | Saved-column business rules in the shared review schema, plus an object index |

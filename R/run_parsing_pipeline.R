@@ -62,10 +62,14 @@ run_parsing_pipeline <- function(
 
   catalog <- readRDS(catalog_rds)
   if (any(catalog$object_kind == "report")) {
-    report_columns_path <- file.path(output_dir, "report_columns.csv")
-    report_filters_path <- file.path(output_dir, "report_filters.csv")
-    report_columns <- extract_report_columns(catalog_rds, report_columns_path)
-    report_filters <- extract_report_filters(catalog_rds, report_filters_path)
+    report_columns <- extract_report_columns(
+      catalog_rds,
+      file.path(output_dir, "report_saved_and_non_saved_columns.csv")
+    )
+    report_filters <- extract_report_filters(
+      catalog_rds,
+      file.path(output_dir, "report_saved_and_non_saved_filters.csv")
+    )
     export_report_dependencies(
       catalog_rds,
       report_columns,

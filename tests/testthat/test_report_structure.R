@@ -48,11 +48,11 @@ testthat::test_that("report columns, filters, and dependencies include inline an
 
   columns <- extract_report_columns(
     input_path,
-    file.path(output_dir, "report_columns.csv")
+    file.path(output_dir, "report_saved_and_non_saved_columns.csv")
   )
   filters <- extract_report_filters(
     input_path,
-    file.path(output_dir, "report_filters.csv")
+    file.path(output_dir, "report_saved_and_non_saved_filters.csv")
   )
   dependencies <- export_report_dependencies(
     input_path,
@@ -73,4 +73,8 @@ testthat::test_that("report columns, filters, and dependencies include inline an
     dependencies$dependency_type,
     c("saved_column", "saved_filter")
   )
+  testthat::expect_true(all(file.exists(file.path(output_dir, c(
+    "report_saved_and_non_saved_columns.csv",
+    "report_saved_and_non_saved_filters.csv"
+  )))))
 })
