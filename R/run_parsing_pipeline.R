@@ -25,6 +25,7 @@ pipeline_files <- c(
   "R/extract/report_xml_helpers.R",
   "R/extract/extract_report_columns.R",
   "R/extract/extract_report_filters.R",
+  "R/extract/extract_saved_column_objects.R",
   "R/extract/extract_saved_columns.R",
   "R/extract/extract_filter_objects.R",
   "R/export/export_filter_criteria.R",
@@ -81,9 +82,18 @@ run_parsing_pipeline <- function(
   }
 
   if (any(catalog$object_kind == "saved_column")) {
-    extract_saved_columns(catalog_rds, file.path(output_dir, "saved_columns.csv"))
-    export_saved_column_review(
+    saved_column_rds <- file.path(output_dir, "saved_column_objects.rds")
+    extract_saved_column_objects(
       catalog_rds,
+      saved_column_rds,
+      file.path(output_dir, "saved_column_objects_summary.csv")
+    )
+    extract_saved_columns(
+      saved_column_rds,
+      file.path(output_dir, "saved_columns.csv")
+    )
+    export_saved_column_review(
+      saved_column_rds,
       file.path(output_dir, "saved_column_review.xlsx"),
       file.path(output_dir, "saved_column_review.csv")
     )

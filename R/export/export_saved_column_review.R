@@ -103,7 +103,7 @@ format_saved_column_condition <- function(condition_node) {
 
 # Stage 3: create a documentation-oriented saved-column review workbook.
 export_saved_column_review <- function(
-    input_path = "output/catalog_extract.rds",
+    input_path = "output/saved_column_objects.rds",
     output_xlsx = "output/saved_column_review.xlsx",
     output_csv = "output/saved_column_review.csv") {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
@@ -112,11 +112,15 @@ export_saved_column_review <- function(
   }
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
   catalog <- readRDS(input_path)
-  required <- c("catalog_index", "object_kind", "object_title", "original_path", "xml_text")
+  required <- c(
+    "saved_column_object_index", "catalog_index", "object_kind",
+    "object_title", "original_path", "xml_text"
+  )
   missing <- setdiff(required, names(catalog))
   if (length(missing)) stop("Input is missing columns: ", paste(missing, collapse = ", "))
-  catalog <- catalog[catalog$object_kind == "saved_column", , drop = FALSE]
-  if (!nrow(catalog)) stop("No saved-column objects were found.")
+  if (!nrow(catalog) || any(catalog$object_kind != "saved_column")) {
+    stop("Input must contain only saved-column objects.")
+  }
 
   clean_text <- saved_column_clean_text
   find_text <- function(node, xpath) clean_text(xml2::xml_find_first(node, xpath))
@@ -146,7 +150,7 @@ export_saved_column_review <- function(
       for (j in seq_along(rules)) {
         review_rows[[length(review_rows) + 1L]] <- data.frame(
           saved_column_name = catalog$object_title[i],
-          rule_id = paste0("SC", i, "-R", j),
+          rule_id = paste0("SC", catalog$saved_column_object_index[i], "-R", j),
           bin_criterion = format_saved_column_condition(
             xml2::xml_find_first(rules[[j]], ".//*[local-name()='condition']")
           ),
@@ -159,7 +163,7 @@ export_saved_column_review <- function(
       if (!inherits(otherwise, "xml_missing")) {
         review_rows[[length(review_rows) + 1L]] <- data.frame(
           saved_column_name = catalog$object_title[i],
-          rule_id = paste0("SC", i, "-OTHER"),
+          rule_id = paste0("SC", catalog$saved_column_object_index[i], "-OTHER"),
           bin_criterion = "All other values",
           bin_label = find_text(otherwise, ".//*[local-name()='value']/*[local-name()='expr']"),
           explanation = "",
@@ -172,7 +176,7 @@ export_saved_column_review <- function(
       formula <- find_text(column, ".//*[local-name()='columnFormula']/*[local-name()='expr']")
       review_rows[[length(review_rows) + 1L]] <- data.frame(
         saved_column_name = catalog$object_title[i],
-        rule_id = paste0("SC", i, "-FORMULA"),
+        rule_id = paste0("SC", catalog$saved_column_object_index[i], "-FORMULA"),
         bin_criterion = formula,
         bin_label = if (is.na(column_heading)) "Calculated value" else column_heading,
         explanation = "",
@@ -184,6 +188,7 @@ export_saved_column_review <- function(
     }
 
     object_rows[[length(object_rows) + 1L]] <- data.frame(
+      saved_column_object_index = catalog$saved_column_object_index[i],
       catalog_index = catalog$catalog_index[i],
       saved_column_name = catalog$object_title[i],
       column_type = column_type,

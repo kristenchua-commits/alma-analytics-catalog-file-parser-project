@@ -124,7 +124,9 @@ because it does not feed the report builder.
 | Shared catalog extraction | `R/extract/extract_catalog.R`; `R/io/read_catalog_file.R`; `R/io/read_catalog_metadata.R` | `.catalog` file | `catalog_extract.rds`; `catalog_extract_summary.csv` |
 | Metadata and XML-tag inspection | `R/inspect/inspect_catalog_metadata.R`; `R/extract/extract_xml_tag_inventory.R` | `catalog_extract.rds` | `catalog_metadata_inventory.csv`; `xml_tag_inventory.csv` |
 | Report structure extraction | `R/extract/extract_report_columns.R`; `R/extract/extract_report_filters.R`; `R/export/export_report_dependencies.R` | Report rows and XML in `catalog_extract.rds` | `report_saved_and_non_saved_columns.csv`; `report_saved_and_non_saved_filters.csv`; `report_dependencies.csv` |
-| Saved-column parsing and review | `R/extract/extract_saved_columns.R`; `R/export/export_saved_column_review.R` | Saved-column rows in `catalog_extract.rds` | `saved_columns.csv`; `saved_column_review.xlsx`; `saved_column_review.csv` |
+| Saved-column object selection | `R/extract/extract_saved_column_objects.R` | Saved-column rows in `catalog_extract.rds` | `saved_column_objects.rds`; `saved_column_objects_summary.csv` |
+| Detailed saved columns | `R/extract/extract_saved_columns.R` | `saved_column_objects.rds` | `saved_columns.csv` |
+| Saved-column review | `R/export/export_saved_column_review.R` | `saved_column_objects.rds` | `saved_column_review.xlsx`; `saved_column_review.csv` |
 | Filter-object selection | `R/extract/extract_filter_objects.R` | Filter rows in `catalog_extract.rds` | `filter_objects.rds`; `filter_objects_summary.csv` |
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
 | Filter review | `R/export/export_filter_review.R` | `filter_objects.rds` | `filter_review.xlsx`; `filter_review.csv`; `filter_review_value_lists.csv` |
@@ -186,14 +188,18 @@ catalog extract.
 
 ### Saved-column branch
 
-When the catalog contains `saved_column` objects, the orchestrator runs
-`R/extract/extract_saved_columns.R` and
-`R/export/export_saved_column_review.R`.
+When the catalog contains `saved_column` objects, the orchestrator first runs
+`R/extract/extract_saved_column_objects.R`. It selects the saved-column rows,
+adds a stable `saved_column_object_index`, and creates
+`saved_column_objects.rds` with the raw XML plus a spreadsheet-friendly
+`saved_column_objects_summary.csv` without XML.
 
-The first script creates the detailed saved-column export. The review exporter
-turns formulas and XML `when`, `condition`, `value`, and `otherwise` elements
-into SQL-formatted criteria, labels, and rule IDs. Alma operators are rendered
-as SQL operators such as `=`, `IN`, `IS NULL`, and `LIKE`.
+Both downstream saved-column processors read that specialized intermediate
+independently. `R/extract/extract_saved_columns.R` creates the detailed column
+export. `R/export/export_saved_column_review.R` turns formulas and XML `when`,
+`condition`, `value`, and `otherwise` elements into SQL-formatted criteria,
+labels, and rule IDs. Alma operators are rendered as SQL operators such as `=`,
+`IN`, `IS NULL`, and `LIKE`.
 
 ### Filter branch
 
@@ -278,6 +284,8 @@ Campus documentation filenames use this pattern:
 | `report_saved_and_non_saved_columns.csv` | All report-selected columns, with canonical saved-column names and report-specific display headings kept separate |
 | `report_saved_and_non_saved_filters.csv` | All report filter terms; `filter_source` distinguishes non-saved definitions from saved-filter references |
 | `report_dependencies.csv` | Distinct report-to-saved-column/filter paths with target-resolution status |
+| `saved_column_objects.rds` | Saved-column object intermediate, including raw XML |
+| `saved_column_objects_summary.csv` | Spreadsheet-friendly saved-column object metadata without XML |
 | `saved_columns.csv` | Parsed saved-column definitions |
 | `saved_column_review.xlsx` | Saved-column business rules in the shared review schema, plus an object index |
 | `saved_column_review.csv` | CSV version of the saved-column rules in the shared review schema |
@@ -319,11 +327,11 @@ Rscript tests/testthat.R
 
 The test executes the complete filter branch in a temporary directory, checks
 its expected files, and verifies that report and saved-column outputs are
-skipped. A synthetic report fixture separately verifies inline columns, saved
-column references, inline filter terms, saved filter references, and resolved
-dependencies. The suite uses `testthat` when installed and otherwise runs
-equivalent assertions with base R. It does not currently test saved-column rule
-content, the manually normalized workbook, or the campus exclusions-documentation
+skipped. Synthetic fixtures verify report references and dependencies as well
+as the saved-column object intermediate and both of its downstream consumers.
+The suite uses `testthat` when installed and otherwise runs equivalent
+assertions with base R. It does not currently exhaustively test saved-column
+rule content, the manually normalized workbook, or the campus exclusions-documentation
 exporter.
 
 ## Repository layout

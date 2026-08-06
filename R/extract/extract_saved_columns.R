@@ -1,16 +1,20 @@
 # Stage 2: flatten column definitions from saved-column objects.
 extract_saved_columns <- function(
-    input_path = "output/catalog_extract.rds",
+    input_path = "output/saved_column_objects.rds",
     output_path = "output/saved_columns.csv") {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
   catalog <- readRDS(input_path)
-  required <- c("catalog_index", "object_kind", "object_title", "xml_text")
+  required <- c(
+    "saved_column_object_index", "catalog_index", "object_kind",
+    "object_title", "subject_area", "original_path", "xml_text"
+  )
   missing <- setdiff(required, names(catalog))
   if (length(missing)) stop("Input is missing columns: ", paste(missing, collapse = ", "))
 
-  catalog <- catalog[catalog$object_kind == "saved_column", , drop = FALSE]
-  if (!nrow(catalog)) stop("No saved-column objects were found.")
+  if (!nrow(catalog) || any(catalog$object_kind != "saved_column")) {
+    stop("Input must contain only saved-column objects.")
+  }
 
   clean_text <- function(node) {
     value <- trimws(gsub("[[:space:]]+", " ", xml2::xml_text(node)))
@@ -38,6 +42,7 @@ extract_saved_columns <- function(
       node <- nodes[[j]]
       expr <- xml2::xml_find_first(node, ".//*[local-name()='expr']")
       data.frame(
+        saved_column_object_index = catalog$saved_column_object_index[i],
         catalog_index = catalog$catalog_index[i],
         saved_column_index = j,
         object_title = catalog$object_title[i],

@@ -120,14 +120,13 @@ render_pipeline_diagram <- function(
              sep = "\n"
            ),
            palette$diagnostic, font = 2, cex = 0.66)
-  draw_box(7.15, 5.65, 4.25, 1.15,
+  draw_box(7.15, 5.78, 4.25, 0.9,
            paste(
-             "Saved-column parsing and review",
-             "R/extract/extract_saved_columns.R",
-             "R/export/export_saved_column_review.R",
+             "Saved-column object selection",
+             "R/extract/extract_saved_column_objects.R",
              sep = "\n"
            ),
-           palette$process, font = 2, cex = 0.66)
+           palette$process, font = 2, cex = 0.67)
   draw_box(12.45, 5.78, 5.0, 0.9,
            paste(
              "Filter-object selection",
@@ -136,7 +135,7 @@ render_pipeline_diagram <- function(
            ),
            palette$process, font = 2, cex = 0.69)
   connect(8, 7.05, 2.45, 5.65, 0.39, 0.58)
-  connect(8, 7.05, 7.15, 5.65, 0.39, 0.58)
+  connect(8, 7.05, 7.15, 5.78, 0.39, 0.45)
   connect(8, 7.05, 12.45, 5.78, 0.39, 0.45)
 
   # Inspection outputs.
@@ -145,35 +144,45 @@ render_pipeline_diagram <- function(
            palette$diagnostic)
   connect(2.45, 5.65, 2.45, 4.05, 0.58, 0.45)
 
-  # Saved-column outputs.
-  draw_box(7.15, 4.0, 4.25, 1.05,
-           paste(
-             "Saved-column outputs",
-             "saved_columns.csv",
-             "saved_column_review.xlsx",
-             "saved_column_review.csv",
-             sep = "\n"
-           ),
-           palette$final, font = 2)
-  connect(7.15, 5.65, 7.15, 4.0, 0.58, 0.53)
+  # Saved-column branch and its two consumers.
+  draw_box(7.15, 4.48, 4.35, 0.78,
+           "saved_column_objects.rds\nsaved_column_objects_summary.csv",
+           palette$intermediate, font = 2, cex = 0.72)
+  connect(7.15, 5.78, 7.15, 4.48, 0.45, 0.39)
+  draw_box(5.7, 3.15, 2.7, 0.88,
+           "Detailed export\nR/extract/extract_saved_columns.R",
+           palette$process, font = 2, cex = 0.62)
+  draw_box(8.55, 3.15, 2.7, 0.88,
+           "Review export\nR/export/export_saved_column_review.R",
+           palette$process, font = 2, cex = 0.60)
+  connect(7.15, 4.48, 5.7, 3.15, 0.39, 0.44)
+  connect(7.15, 4.48, 8.55, 3.15, 0.39, 0.44)
+  draw_box(5.7, 1.88, 2.7, 0.72,
+           "saved_columns.csv",
+           palette$diagnostic, font = 2)
+  draw_box(8.55, 1.78, 2.7, 1.0,
+           "Saved-column review outputs\nsaved_column_review.xlsx\nsaved_column_review.csv",
+           palette$final, font = 2, cex = 0.66)
+  connect(5.7, 3.15, 5.7, 1.88, 0.44, 0.36)
+  connect(8.55, 3.15, 8.55, 1.78, 0.44, 0.50)
 
   # Filter branch and its two exporters.
   draw_box(12.45, 4.48, 4.35, 0.78,
            "filter_objects.rds\nfilter_objects_summary.csv",
            palette$intermediate, font = 2)
   connect(12.45, 5.78, 12.45, 4.48, 0.45, 0.39)
-  draw_box(10.35, 3.15, 4.0, 0.88,
+  draw_box(11.2, 3.15, 2.5, 0.88,
            "Criteria export\nR/export/export_filter_criteria.R",
-           palette$process, font = 2, cex = 0.67)
-  draw_box(14.05, 3.15, 3.65, 0.88,
+           palette$process, font = 2, cex = 0.61)
+  draw_box(14.25, 3.15, 2.9, 0.88,
            "Review export\nR/export/export_filter_review.R",
-           palette$process, font = 2, cex = 0.67)
-  connect(12.45, 4.48, 10.35, 3.15, 0.39, 0.44)
-  connect(12.45, 4.48, 14.05, 3.15, 0.39, 0.44)
-  draw_box(10.35, 1.88, 3.65, 0.72,
+           palette$process, font = 2, cex = 0.64)
+  connect(12.45, 4.48, 11.2, 3.15, 0.39, 0.44)
+  connect(12.45, 4.48, 14.25, 3.15, 0.39, 0.44)
+  draw_box(11.2, 1.88, 2.5, 0.72,
            "filter_criteria.csv",
            palette$diagnostic, font = 2)
-  draw_box(14.05, 1.78, 3.65, 1.0,
+  draw_box(14.25, 1.78, 2.9, 1.0,
            paste(
              "Filter review outputs",
              "filter_review.xlsx",
@@ -181,9 +190,9 @@ render_pipeline_diagram <- function(
              "filter_review_value_lists.csv",
              sep = "\n"
            ),
-           palette$final, font = 2, cex = 0.72)
-  connect(10.35, 3.15, 10.35, 1.88, 0.44, 0.36)
-  connect(14.05, 3.15, 14.05, 1.78, 0.44, 0.50)
+           palette$final, font = 2, cex = 0.65)
+  connect(11.2, 3.15, 11.2, 1.88, 0.44, 0.36)
+  connect(14.25, 3.15, 14.25, 1.78, 0.44, 0.50)
 
   # Legend.
   legend_y <- 0.78
