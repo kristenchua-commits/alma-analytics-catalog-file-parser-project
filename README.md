@@ -20,7 +20,7 @@ writes spreadsheet-friendly CSV files without the large `xml_text` column.
 ## Requirements
 
 - R 4.1 or newer
-- Core parser: the R packages `xml2` and `writexl`
+- Core parser: the R package `xml2`
 - Campus exclusions-documentation export: `readxl` and `openxlsx2`
 - Optional notebook execution: an R Jupyter kernel and `IRdisplay`
 - Optional test runner: `testthat`; equivalent base-R assertions run when it is
@@ -29,7 +29,7 @@ writes spreadsheet-friendly CSV files without the large `xml_text` column.
 Install the packages needed for both documented workflows with:
 
 ```r
-install.packages(c("xml2", "writexl", "readxl", "openxlsx2"))
+install.packages(c("xml2", "readxl", "openxlsx2"))
 ```
 
 ## Run the automated parser pipeline
@@ -126,10 +126,10 @@ because it does not feed the report builder.
 | Report structure extraction | `R/extract/extract_report_columns.R`; `R/extract/extract_report_filters.R`; `R/export/export_report_dependencies.R` | Report rows and XML in `catalog_extract.rds` | `report_saved_and_non_saved_columns.csv`; `report_saved_and_non_saved_filters.csv`; `report_dependencies.csv` |
 | Saved-column object selection | `R/extract/extract_saved_column_objects.R` | Saved-column rows in `catalog_extract.rds` | `saved_column_objects.rds`; `saved_column_objects_summary.csv` |
 | Detailed saved columns | `R/extract/extract_saved_columns.R` | `saved_column_objects.rds` | `saved_columns.csv` |
-| Saved-column review | `R/export/export_saved_column_review.R` | `saved_column_objects.rds` | `saved_column_review.xlsx`; `saved_column_review.csv` |
+| Saved-column review | `R/export/export_saved_column_review.R` | `saved_column_objects.rds` | `saved_column_review.csv` |
 | Filter-object selection | `R/extract/extract_filter_objects.R` | Filter rows in `catalog_extract.rds` | `filter_objects.rds`; `filter_objects_summary.csv` |
 | Detailed filter criteria | `R/export/export_filter_criteria.R` | `filter_objects.rds` | `filter_criteria.csv` |
-| Filter review | `R/export/export_filter_review.R` | `filter_objects.rds` | `filter_review.xlsx`; `filter_review.csv`; `filter_review_value_lists.csv` |
+| Filter review | `R/export/export_filter_review.R` | `filter_objects.rds` | `filter_review.csv`; `filter_review_value_lists.csv` |
 | Reviewed normalization | Manual review in `output/normalized_combined_saved_column_and_filter_review.xlsx` | Saved-column and filter review rows | Campus, domain, labels, explanations, and campus worksheets |
 | Campus documentation publication | `scripts/export_documentation/export_exclusions_documentation.R` | Reviewed normalized workbook and source `.catalog` file | One exclusions-documentation workbook per `UC*` worksheet |
 
@@ -287,12 +287,10 @@ Campus documentation filenames use this pattern:
 | `saved_column_objects.rds` | Saved-column object intermediate, including raw XML |
 | `saved_column_objects_summary.csv` | Spreadsheet-friendly saved-column object metadata without XML |
 | `saved_columns.csv` | Parsed saved-column definitions |
-| `saved_column_review.xlsx` | Saved-column business rules in the shared review schema, plus an object index |
 | `saved_column_review.csv` | CSV version of the saved-column rules in the shared review schema |
 | `filter_objects.rds` | Full filter objects including XML |
 | `filter_objects_summary.csv` | Spreadsheet-friendly filter object metadata |
 | `filter_criteria.csv` | Flattened filter expressions and criteria |
-| `filter_review.xlsx` | Filter business rules in the shared review schema, plus value-list and object-index sheets |
 | `filter_review.csv` | CSV version of the filter rules in the shared review schema |
 | `filter_review_value_lists.csv` | Individual values from large `IN`/`NOT IN` lists |
 | `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_parsing_pipeline()` |

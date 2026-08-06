@@ -94,7 +94,6 @@ run_parsing_pipeline <- function(
     )
     export_saved_column_review(
       saved_column_rds,
-      file.path(output_dir, "saved_column_review.xlsx"),
       file.path(output_dir, "saved_column_review.csv")
     )
   } else {
@@ -111,7 +110,6 @@ run_parsing_pipeline <- function(
     export_filter_criteria(filter_rds, file.path(output_dir, "filter_criteria.csv"))
     export_filter_review(
       filter_rds,
-      file.path(output_dir, "filter_review.xlsx"),
       file.path(output_dir, "filter_review.csv"),
       file.path(output_dir, "filter_review_value_lists.csv")
     )

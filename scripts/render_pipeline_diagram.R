@@ -161,7 +161,7 @@ render_pipeline_diagram <- function(
            "saved_columns.csv",
            palette$diagnostic, font = 2)
   draw_box(8.55, 1.78, 2.7, 1.0,
-           "Saved-column review outputs\nsaved_column_review.xlsx\nsaved_column_review.csv",
+           "Saved-column review output\nsaved_column_review.csv",
            palette$final, font = 2, cex = 0.66)
   connect(5.7, 3.15, 5.7, 1.88, 0.44, 0.36)
   connect(8.55, 3.15, 8.55, 1.78, 0.44, 0.50)
@@ -185,7 +185,6 @@ render_pipeline_diagram <- function(
   draw_box(14.25, 1.78, 2.9, 1.0,
            paste(
              "Filter review outputs",
-             "filter_review.xlsx",
              "filter_review.csv",
              "filter_review_value_lists.csv",
              sep = "\n"

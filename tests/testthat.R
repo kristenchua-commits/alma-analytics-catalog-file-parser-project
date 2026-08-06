@@ -18,7 +18,6 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     "filter_objects.rds",
     "filter_objects_summary.csv",
     "filter_criteria.csv",
-    "filter_review.xlsx",
     "filter_review.csv",
     "filter_review_value_lists.csv"
   )
@@ -27,10 +26,11 @@ if (requireNamespace("testthat", quietly = TRUE)) {
     nrow(catalog) > 0L,
     any(catalog$object_kind == "filter"),
     all(file.exists(file.path(output_dir, expected_files))),
+    !file.exists(file.path(output_dir, "filter_review.xlsx")),
     !file.exists(file.path(output_dir, "saved_column_objects.rds")),
     !file.exists(file.path(output_dir, "saved_column_objects_summary.csv")),
     !file.exists(file.path(output_dir, "saved_columns.csv")),
-    !file.exists(file.path(output_dir, "saved_column_review.xlsx")),
+    !file.exists(file.path(output_dir, "saved_column_review.csv")),
     !file.exists(file.path(output_dir, "report_saved_and_non_saved_columns.csv")),
     !file.exists(file.path(output_dir, "report_saved_and_non_saved_filters.csv")),
     !file.exists(file.path(output_dir, "report_dependencies.csv"))
@@ -121,7 +121,6 @@ if (requireNamespace("testthat", quietly = TRUE)) {
   )
   saved_review <- export_saved_column_review(
     saved_column_rds,
-    file.path(saved_column_output, "saved_column_review.xlsx"),
     file.path(saved_column_output, "saved_column_review.csv")
   )
   stopifnot(

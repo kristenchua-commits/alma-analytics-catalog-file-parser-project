@@ -30,13 +30,12 @@ testthat::test_that("saved-column outputs consume the saved-column object interm
   objects_path <- file.path(output_dir, "saved_column_objects.rds")
   summary_path <- file.path(output_dir, "saved_column_objects_summary.csv")
   columns_path <- file.path(output_dir, "saved_columns.csv")
-  review_xlsx <- file.path(output_dir, "saved_column_review.xlsx")
   review_csv <- file.path(output_dir, "saved_column_review.csv")
   saveRDS(catalog, catalog_path)
 
   objects <- extract_saved_column_objects(catalog_path, objects_path, summary_path)
   columns <- extract_saved_columns(objects_path, columns_path)
-  review <- export_saved_column_review(objects_path, review_xlsx, review_csv)
+  review <- export_saved_column_review(objects_path, review_csv)
 
   testthat::expect_equal(nrow(objects), 1L)
   testthat::expect_equal(objects$object_kind, "saved_column")
@@ -45,6 +44,6 @@ testthat::test_that("saved-column outputs consume the saved-column object interm
   testthat::expect_equal(columns$saved_column_object_index, 1L)
   testthat::expect_equal(nrow(review$review), 1L)
   testthat::expect_true(all(file.exists(c(
-    objects_path, summary_path, columns_path, review_xlsx, review_csv
+    objects_path, summary_path, columns_path, review_csv
   ))))
 })

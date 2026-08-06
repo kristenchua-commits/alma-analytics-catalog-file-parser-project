@@ -101,15 +101,11 @@ format_saved_column_condition <- function(condition_node) {
   saved_column_clean_text(expression)
 }
 
-# Stage 3: create a documentation-oriented saved-column review workbook.
+# Stage 3: create a documentation-oriented saved-column review CSV.
 export_saved_column_review <- function(
     input_path = "output/saved_column_objects.rds",
-    output_xlsx = "output/saved_column_review.xlsx",
     output_csv = "output/saved_column_review.csv") {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
-  if (!requireNamespace("writexl", quietly = TRUE)) {
-    stop("Package 'writexl' is required. Install it with install.packages('writexl').")
-  }
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
   catalog <- readRDS(input_path)
   required <- c(
@@ -216,13 +212,8 @@ export_saved_column_review <- function(
     value_count = rep(NA_integer_, nrow(review)),
     stringsAsFactors = FALSE
   )
-  review_sheet <- review_output
-  dir.create(dirname(output_xlsx), recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(output_csv), recursive = TRUE, showWarnings = FALSE)
   write.csv(review_output, output_csv, row.names = FALSE, na = "")
-  writexl::write_xlsx(
-    list("Saved Column Review" = review_sheet, "Object Index" = object_index),
-    output_xlsx
-  )
-  message("Wrote ", output_xlsx, " (", nrow(review), " review rows)")
+  message("Wrote ", output_csv, " (", nrow(review), " review rows)")
   invisible(list(review = review, object_index = object_index))
 }

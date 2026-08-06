@@ -1,4 +1,4 @@
-# Stage 3: create a concise, documentation-oriented filter review workbook.
+# Stage 3: create concise, documentation-oriented filter review CSVs.
 filter_review_cell_character_limit <- 32767L
 
 format_filter_list_criterion <- function(
@@ -21,13 +21,9 @@ format_filter_list_criterion <- function(
 
 export_filter_review <- function(
     input_path = "output/filter_objects.rds",
-    output_xlsx = "output/filter_review.xlsx",
     review_csv = "output/filter_review.csv",
     values_csv = "output/filter_review_value_lists.csv") {
   if (!requireNamespace("xml2", quietly = TRUE)) stop("Package 'xml2' is required.")
-  if (!requireNamespace("writexl", quietly = TRUE)) {
-    stop("Package 'writexl' is required. Install it with install.packages('writexl').")
-  }
   if (!file.exists(input_path)) stop("Missing input file: ", input_path)
   filters <- readRDS(input_path)
 
@@ -163,7 +159,7 @@ export_filter_review <- function(
   )])
   names(object_index)[names(object_index) == "object_title"] <- "filter_name"
 
-  dir.create(dirname(output_xlsx), recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(review_csv), recursive = TRUE, showWarnings = FALSE)
   review_output <- data.frame(
     rule_name = review$filter_name,
     criterion_text = review$filter_criterion,
@@ -179,28 +175,7 @@ export_filter_review <- function(
   )
   write.csv(review_output, review_csv, row.names = FALSE, na = "")
   write.csv(value_lists, values_csv, row.names = FALSE, na = "")
-  review_sheet <- review_output
-  value_list_summary <- if (nrow(value_lists)) {
-    groups <- split(value_lists, value_lists$criterion_id)
-    do.call(rbind, lapply(groups, function(group) data.frame(
-      filter_name = group$filter_name[1L],
-      criterion_id = group$criterion_id[1L],
-      field = group$field[1L],
-      value_count = nrow(group),
-      sample_values = paste(utils::head(group$value, 10L), collapse = ", "),
-      stringsAsFactors = FALSE
-    )))
-  } else {
-    data.frame(filter_name = character(0), criterion_id = character(0),
-               field = character(0), value_count = integer(0),
-               sample_values = character(0))
-  }
-  writexl::write_xlsx(
-    list("Filter Review" = review_sheet, "Value List Summary" = value_list_summary,
-         "Object Index" = object_index),
-    output_xlsx
-  )
-  message("Wrote ", output_xlsx, " (", nrow(review), " review rows)")
+  message("Wrote ", review_csv, " (", nrow(review), " review rows)")
   message("Wrote ", values_csv, " (", nrow(value_lists), " list values)")
   invisible(list(review = review, value_lists = value_lists, object_index = object_index))
 }
