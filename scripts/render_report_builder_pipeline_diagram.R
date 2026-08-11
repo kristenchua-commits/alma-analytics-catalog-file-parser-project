@@ -123,12 +123,12 @@ render_report_builder_pipeline_diagram <- function(
     col = palette$arrow
   )
 
-  # Parser-side producers and their review outputs.
+  # Parser-side producers and their rule outputs.
   draw_box(
     3.1, 8.50, 5.3, 0.95,
     paste(
-      "Saved-column review exporter",
-      "R/export/export_saved_column_review.R",
+      "General column parser",
+      "R/extract/extract_columns.R",
       sep = "\n"
     ),
     palette$process,
@@ -138,8 +138,8 @@ render_report_builder_pipeline_diagram <- function(
   draw_box(
     8.8, 8.50, 5.0, 0.95,
     paste(
-      "Filter review exporter",
-      "R/export/export_filter_review.R",
+      "General filter parser",
+      "R/extract/extract_filters.R",
       sep = "\n"
     ),
     palette$process,
@@ -156,14 +156,14 @@ render_report_builder_pipeline_diagram <- function(
 
   draw_box(
     3.1, 7.20, 4.6, 0.82,
-    "saved_column_review.csv\ncanonical SQL-formatted criteria",
+    "column_rules.csv\ninline and standalone column rules",
     palette$parser,
     font = 2,
     cex = 0.70
   )
   draw_box(
     8.8, 7.20, 4.6, 0.82,
-    "filter_review.csv\nfilter_review_value_lists.csv",
+    "filter_rules.csv\nfilter_value_lists.csv",
     palette$parser,
     font = 2,
     cex = 0.70
@@ -206,12 +206,12 @@ render_report_builder_pipeline_diagram <- function(
   )
   connect_orthogonal(rbind(c(5.7, 5.23), c(5.7, 4.71)))
 
-  # Optional notebook controller and an explicitly excluded audit branch.
+  # Optional notebook controller and technical inventories.
   draw_box(
     12.25, 5.82, 5.7, 1.04,
     paste(
       "Optional validation and execution notebook",
-      "docs/notebooks/",
+      "documentation/notebooks/",
       "campus_saved_column_filter_documentation_construction.ipynb",
       sep = "\n"
     ),
@@ -222,8 +222,8 @@ render_report_builder_pipeline_diagram <- function(
   draw_box(
     12.65, 4.25, 5.2, 0.90,
     paste(
-      "Audit-only branch — not used by report builder",
-      "R/export/export_filter_criteria.R -> filter_criteria.csv",
+      "Technical inventories — not used by report builder",
+      "columns.csv + filters.csv",
       sep = "\n"
     ),
     palette$reference,
@@ -231,8 +231,8 @@ render_report_builder_pipeline_diagram <- function(
     cex = 0.62
   )
 
-  # Publication script consumes the normalized workbook, canonical saved-column
-  # review, source archive date, and optional notebook instruction.
+  # Publication script consumes the normalized workbook, canonical column
+  # rules, source archive date, and optional notebook instruction.
   draw_box(
     8.0, 2.92, 9.3, 1.22,
     paste(

@@ -23,15 +23,9 @@ pipeline_files <- c(
   "R/inspect/inspect_catalog_metadata.R",
   "R/extract/extract_xml_tag_inventory.R",
   "R/extract/report_xml_helpers.R",
-  "R/extract/extract_report_columns.R",
-  "R/extract/extract_report_filters.R",
-  "R/extract/extract_saved_column_objects.R",
-  "R/extract/extract_saved_columns.R",
-  "R/extract/extract_filter_objects.R",
-  "R/export/export_filter_criteria.R",
-  "R/export/export_filter_review.R",
-  "R/export/export_report_dependencies.R",
-  "R/export/export_saved_column_review.R"
+  "R/extract/extract_columns.R",
+  "R/extract/extract_filters.R",
+  "R/export/export_report_dependencies.R"
 )
 for (pipeline_file in pipeline_files) {
   source(file.path(pipeline_project_root, pipeline_file))
@@ -62,59 +56,39 @@ run_parsing_pipeline <- function(
   )
 
   catalog <- readRDS(catalog_rds)
-  if (any(catalog$object_kind == "report")) {
-    report_columns <- extract_report_columns(
+  column_results <- NULL
+  if (any(catalog$object_kind %in% c("report", "saved_column"))) {
+    column_results <- extract_columns(
       catalog_rds,
-      file.path(output_dir, "report_saved_and_non_saved_columns.csv")
+      file.path(output_dir, "columns.csv"),
+      file.path(output_dir, "column_rules.csv")
     )
-    report_filters <- extract_report_filters(
+  } else {
+    message("No report or saved-column objects; skipping column outputs")
+  }
+
+  filter_results <- NULL
+  if (any(catalog$object_kind %in% c("report", "filter"))) {
+    filter_results <- extract_filters(
       catalog_rds,
-      file.path(output_dir, "report_saved_and_non_saved_filters.csv")
+      file.path(output_dir, "filters.csv"),
+      file.path(output_dir, "filter_rules.csv"),
+      file.path(output_dir, "filter_value_lists.csv")
     )
+  } else {
+    message("No report or saved-filter objects; skipping filter outputs")
+  }
+
+  if (any(catalog$object_kind == "report") &&
+      !is.null(column_results) && !is.null(filter_results)) {
     export_report_dependencies(
       catalog_rds,
-      report_columns,
-      report_filters,
+      column_results$columns,
+      filter_results$filters,
       file.path(output_dir, "report_dependencies.csv")
     )
   } else {
-    message("No report objects; skipping report structure outputs")
-  }
-
-  if (any(catalog$object_kind == "saved_column")) {
-    saved_column_rds <- file.path(output_dir, "saved_column_objects.rds")
-    extract_saved_column_objects(
-      catalog_rds,
-      saved_column_rds,
-      file.path(output_dir, "saved_column_objects_summary.csv")
-    )
-    extract_saved_columns(
-      saved_column_rds,
-      file.path(output_dir, "saved_columns.csv")
-    )
-    export_saved_column_review(
-      saved_column_rds,
-      file.path(output_dir, "saved_column_review.csv")
-    )
-  } else {
-    message("No saved-column objects; skipping saved-column outputs")
-  }
-
-  if (any(catalog$object_kind == "filter")) {
-    filter_rds <- file.path(output_dir, "filter_objects.rds")
-    extract_filter_objects(
-      catalog_rds,
-      filter_rds,
-      file.path(output_dir, "filter_objects_summary.csv")
-    )
-    export_filter_criteria(filter_rds, file.path(output_dir, "filter_criteria.csv"))
-    export_filter_review(
-      filter_rds,
-      file.path(output_dir, "filter_review.csv"),
-      file.path(output_dir, "filter_review_value_lists.csv")
-    )
-  } else {
-    message("No filter objects; skipping filter outputs")
+    message("No report dependency output was required")
   }
 
   message("Pipeline complete: ", normalizePath(output_dir))

@@ -1,5 +1,6 @@
 project_root <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = TRUE)
-source(file.path(project_root, "R", "export", "export_saved_column_review.R"))
+source(file.path(project_root, "R", "extract", "report_xml_helpers.R"))
+source(file.path(project_root, "R", "extract", "extract_columns.R"))
 
 condition_node <- function(expression_type, operator, values, value_types) {
   child_xml <- paste0(
@@ -56,27 +57,27 @@ testthat::test_that("saved-column XML operators are rendered as SQL", {
   )
 
   testthat::expect_identical(
-    format_saved_column_condition(equality),
+    format_column_condition(equality),
     "\"Borrower Details\".\"User Group\" = 'UCM Faculty'"
   )
   testthat::expect_identical(
-    format_saved_column_condition(numeric_equality),
+    format_column_condition(numeric_equality),
     "institution_id = 6532"
   )
   testthat::expect_identical(
-    format_saved_column_condition(null_check),
+    format_column_condition(null_check),
     "\"Borrower Details\".\"User Group\" IS NULL"
   )
   testthat::expect_identical(
-    format_saved_column_condition(in_list),
+    format_column_condition(in_list),
     "\"Borrower Details\".\"User Group\" IN ('Library Staff', 'UCM Staff')"
   )
   testthat::expect_identical(
-    format_saved_column_condition(prefixes),
+    format_column_condition(prefixes),
     "(location_code LIKE 'ah%' OR location_code LIKE 'dl%')"
   )
   testthat::expect_identical(
-    format_saved_column_condition(suffix),
+    format_column_condition(suffix),
     "location_code LIKE '%zw'"
   )
 })

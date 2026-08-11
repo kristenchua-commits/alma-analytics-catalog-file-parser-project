@@ -21,28 +21,15 @@ testthat::test_that("the filter fixture runs through the complete filter branch"
     "catalog_extract_summary.csv",
     "catalog_metadata_inventory.csv",
     "xml_tag_inventory.csv",
-    "filter_objects.rds",
-    "filter_objects_summary.csv",
-    "filter_criteria.csv",
-    "filter_review.csv",
-    "filter_review_value_lists.csv"
+    "filters.csv",
+    "filter_rules.csv",
+    "filter_value_lists.csv"
   )
 
   testthat::expect_true(nrow(catalog) > 0L)
   testthat::expect_true(any(catalog$object_kind == "filter"))
   testthat::expect_true(all(file.exists(file.path(output_dir, expected_files))))
-  testthat::expect_false(file.exists(file.path(output_dir, "filter_review.xlsx")))
-  testthat::expect_false(file.exists(file.path(output_dir, "saved_column_objects.rds")))
-  testthat::expect_false(file.exists(file.path(
-    output_dir, "saved_column_objects_summary.csv"
-  )))
-  testthat::expect_false(file.exists(file.path(output_dir, "saved_columns.csv")))
-  testthat::expect_false(file.exists(file.path(output_dir, "saved_column_review.csv")))
-  testthat::expect_false(file.exists(file.path(
-    output_dir, "report_saved_and_non_saved_columns.csv"
-  )))
-  testthat::expect_false(file.exists(file.path(
-    output_dir, "report_saved_and_non_saved_filters.csv"
-  )))
+  testthat::expect_false(file.exists(file.path(output_dir, "columns.csv")))
+  testthat::expect_false(file.exists(file.path(output_dir, "column_rules.csv")))
   testthat::expect_false(file.exists(file.path(output_dir, "report_dependencies.csv")))
 })

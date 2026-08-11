@@ -1,7 +1,7 @@
 project_root <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = TRUE)
 source(file.path(project_root, "R", "extract", "report_xml_helpers.R"))
-source(file.path(project_root, "R", "extract", "extract_report_columns.R"))
-source(file.path(project_root, "R", "extract", "extract_report_filters.R"))
+source(file.path(project_root, "R", "extract", "extract_columns.R"))
+source(file.path(project_root, "R", "extract", "extract_filters.R"))
 source(file.path(project_root, "R", "export", "export_report_dependencies.R"))
 
 testthat::test_that("report columns, filters, and dependencies include inline and saved definitions", {
@@ -38,6 +38,7 @@ testthat::test_that("report columns, filters, and dependencies include inline an
     catalog_index = 1:3,
     object_kind = c("report", "saved_column", "filter"),
     object_title = c("Test Report", "Test Saved Column", "Test Saved Filter"),
+    subject_area = rep("Physical Items", 3L),
     original_path = c(report_path, saved_column_path, saved_filter_path),
     xml_text = c(
       report_xml,
@@ -47,7 +48,15 @@ testthat::test_that("report columns, filters, and dependencies include inline an
         "<saw:text>Canonical saved heading</saw:text>",
         "</saw:caption></saw:columnHeading></saw:column></savedColumnObject>"
       ),
-      "<savedFilterObject/>"
+      paste0(
+        "<savedFilterObject xmlns:saw='com.siebel.analytics.web/report/v1.1' ",
+        "xmlns:sawx='com.siebel.analytics.web/expression/v1.1' ",
+        "xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>",
+        "<saw:filter><sawx:expr xsi:type='sawx:comparison' op='equal'>",
+        "<sawx:expr xsi:type='sawx:sqlExpression'>saved_field</sawx:expr>",
+        "<sawx:expr xsi:type='xsd:string'>saved_value</sawx:expr>",
+        "</sawx:expr></saw:filter></savedFilterObject>"
+      )
     ),
     stringsAsFactors = FALSE
   )
@@ -57,30 +66,46 @@ testthat::test_that("report columns, filters, and dependencies include inline an
   on.exit(unlink(c(input_path, output_dir), recursive = TRUE), add = TRUE)
   saveRDS(catalog, input_path)
 
-  columns <- extract_report_columns(
+  columns_result <- extract_columns(
     input_path,
-    file.path(output_dir, "report_saved_and_non_saved_columns.csv")
+    file.path(output_dir, "columns.csv"),
+    file.path(output_dir, "column_rules.csv")
   )
-  filters <- extract_report_filters(
+  filters_result <- extract_filters(
     input_path,
-    file.path(output_dir, "report_saved_and_non_saved_filters.csv")
+    file.path(output_dir, "filters.csv"),
+    file.path(output_dir, "filter_rules.csv"),
+    file.path(output_dir, "filter_value_lists.csv")
   )
   dependencies <- export_report_dependencies(
     input_path,
-    columns,
-    filters,
+    columns_result$columns,
+    filters_result$filters,
     file.path(output_dir, "report_dependencies.csv")
   )
 
-  testthat::expect_equal(nrow(columns), 2L)
-  testthat::expect_setequal(columns$column_source, c("inline", "saved_reference"))
-  testthat::expect_equal(columns$report_subject_area, rep("Physical Items", 2L))
+  columns <- columns_result$columns
+  filters <- filters_result$filters
+  testthat::expect_equal(nrow(columns), 3L)
+  testthat::expect_setequal(
+    columns$column_source,
+    c("inline", "saved_reference", "standalone_saved_object")
+  )
+  testthat::expect_equal(
+    columns$report_subject_area[columns$record_scope == "report_column"],
+    rep("Physical Items", 2L)
+  )
   saved_row <- columns[columns$column_source == "saved_reference", ]
   testthat::expect_equal(saved_row$column_name, "Canonical saved heading")
   testthat::expect_equal(saved_row$report_display_name, "Short report heading")
-  testthat::expect_equal(saved_row$saved_column_name, "Test Saved Column")
-  testthat::expect_equal(nrow(filters), 2L)
-  testthat::expect_setequal(filters$filter_source, c("inline", "saved_reference"))
+  testthat::expect_equal(saved_row$definition_name, "Test Saved Column")
+  standalone_column <- columns[columns$record_scope == "standalone_saved_object", ]
+  testthat::expect_true(standalone_column$is_referenced)
+  testthat::expect_equal(nrow(filters), 3L)
+  testthat::expect_setequal(
+    filters$filter_source,
+    c("inline", "saved_reference", "standalone_saved_object")
+  )
   testthat::expect_match(filters$filter_text[filters$filter_source == "inline"], "MAIN")
   testthat::expect_equal(nrow(dependencies), 2L)
   testthat::expect_true(all(dependencies$is_resolved))
@@ -89,7 +114,7 @@ testthat::test_that("report columns, filters, and dependencies include inline an
     c("saved_column", "saved_filter")
   )
   testthat::expect_true(all(file.exists(file.path(output_dir, c(
-    "report_saved_and_non_saved_columns.csv",
-    "report_saved_and_non_saved_filters.csv"
+    "columns.csv", "column_rules.csv", "filters.csv", "filter_rules.csv",
+    "filter_value_lists.csv"
   )))))
 })

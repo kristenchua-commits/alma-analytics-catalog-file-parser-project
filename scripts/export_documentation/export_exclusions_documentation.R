@@ -118,17 +118,17 @@ expected_columns <- c(
   "criterion_text_category"
 )
 
-saved_column_review_path <- file.path(dirname(input_path), "saved_column_review.csv")
-if (!file.exists(saved_column_review_path)) {
+column_rules_path <- file.path(dirname(input_path), "column_rules.csv")
+if (!file.exists(column_rules_path)) {
   stop(
-    "Could not find the canonical saved-column review used to refresh criteria: ",
-    saved_column_review_path,
+    "Could not find the canonical column rules used to refresh criteria: ",
+    column_rules_path,
     call. = FALSE
   )
 }
 
 canonical_saved_columns <- read.csv(
-  saved_column_review_path,
+  column_rules_path,
   stringsAsFactors = FALSE,
   check.names = FALSE,
   na.strings = character()
@@ -140,10 +140,17 @@ canonical_missing_columns <- setdiff(
 )
 if (length(canonical_missing_columns) > 0L) {
   stop(
-    "Canonical saved-column review is missing required column(s): ",
+    "Canonical column rules are missing required column(s): ",
     paste(canonical_missing_columns, collapse = ", "),
     call. = FALSE
   )
+}
+if ("source_type" %in% names(canonical_saved_columns)) {
+  canonical_saved_columns <- canonical_saved_columns[
+    canonical_saved_columns$source_type == "standalone_saved_object",
+    ,
+    drop = FALSE
+  ]
 }
 
 canonical_saved_column_keys <- paste(
@@ -153,7 +160,7 @@ canonical_saved_column_keys <- paste(
 )
 if (anyDuplicated(canonical_saved_column_keys)) {
   stop(
-    "Canonical saved-column review contains duplicate rule_name/rule_id keys.",
+    "Canonical standalone column rules contain duplicate rule_name/rule_id keys.",
     call. = FALSE
   )
 }
@@ -188,7 +195,7 @@ refresh_saved_column_criteria <- function(data, campus) {
   if (any(unmatched_rows)) {
     stop(
       "Worksheet '", campus, "' contains saved-column rule(s) that are not ",
-      "present in the canonical saved-column review: ",
+      "present in the canonical standalone column rules: ",
       paste(unique(normalized_keys[unmatched_rows]), collapse = "; "),
       call. = FALSE
     )

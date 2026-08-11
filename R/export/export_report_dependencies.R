@@ -18,10 +18,11 @@ export_report_dependencies <- function(
   } else report_filters
 
   column_dependencies <- columns[
-    columns$column_source == "saved_reference" &
-      !is.na(columns$saved_column_path) & nzchar(columns$saved_column_path),
+    columns$record_scope == "report_column" &
+      columns$column_source == "saved_reference" &
+      !is.na(columns$definition_path) & nzchar(columns$definition_path),
     c("report_catalog_index", "report_title", "report_path", "column_index",
-      "column_name", "saved_column_path"),
+      "column_name", "definition_path"),
     drop = FALSE
   ]
   if (nrow(column_dependencies)) {
@@ -32,16 +33,17 @@ export_report_dependencies <- function(
       dependency_type = "saved_column",
       source_index = column_dependencies$column_index,
       dependency_name = column_dependencies$column_name,
-      dependency_path = column_dependencies$saved_column_path,
+      dependency_path = column_dependencies$definition_path,
       stringsAsFactors = FALSE
     )
   }
 
   filter_dependencies <- filters[
-    filters$filter_source == "saved_reference" &
-      !is.na(filters$saved_filter_path) & nzchar(filters$saved_filter_path),
+    filters$record_scope == "report_filter" &
+      filters$filter_source == "saved_reference" &
+      !is.na(filters$definition_path) & nzchar(filters$definition_path),
     c("report_catalog_index", "report_title", "report_path", "filter_index",
-      "saved_filter_name", "saved_filter_path"),
+      "definition_name", "definition_path"),
     drop = FALSE
   ]
   if (nrow(filter_dependencies)) {
@@ -51,8 +53,8 @@ export_report_dependencies <- function(
       report_path = filter_dependencies$report_path,
       dependency_type = "saved_filter",
       source_index = filter_dependencies$filter_index,
-      dependency_name = filter_dependencies$saved_filter_name,
-      dependency_path = filter_dependencies$saved_filter_path,
+      dependency_name = filter_dependencies$definition_name,
+      dependency_path = filter_dependencies$definition_path,
       stringsAsFactors = FALSE
     )
   }
