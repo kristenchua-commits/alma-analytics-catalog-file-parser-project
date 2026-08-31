@@ -191,6 +191,22 @@ their relevant report and standalone object types are both absent.
 `run_parsing_pipeline()` ends after creating the general column and filter rule files.
 It does not create the normalized combined workbook automatically.
 
+To create an unreviewed workbook covering every inline and standalone column,
+bin branch, and filter criterion, run:
+
+```sh
+Rscript scripts/build_all_column_filter_bin_review.R
+```
+
+The script reads `columns.csv`, `column_rules.csv`, `filters.csv`,
+`filter_rules.csv`, and `filter_value_lists.csv`. Its default output is
+`output/normalized_combined_all_column_filter_bin_review.xlsx`. Optional first
+and second arguments override the parser-output directory and workbook path.
+The workbook includes combined and type-specific review sheets, full column and
+filter inventories, and expanded values for list filters. Inline rows retain
+their report title/path; standalone rows retain their saved-object definition
+name/path.
+
 `output/normalized_combined_saved_column_and_filter_review.xlsx` is a reviewed
 input to the publication step. It combines filter and saved-column rules and
 adds human-maintained fields, including:
@@ -257,6 +273,7 @@ Campus documentation filenames use this pattern:
 | `filter_rules.csv` | Readable leaf criteria for inline and standalone filters |
 | `filter_value_lists.csv` | Individual values from large `IN` and `NOT IN` lists |
 | `report_dependencies.csv` | Distinct report-to-saved-column/filter paths with target-resolution status |
+| `normalized_combined_all_column_filter_bin_review.xlsx` | Scripted review workbook for all inline and standalone columns, bin branches, filters, inventories, and expanded list values |
 | `normalized_combined_saved_column_and_filter_review.xlsx` | Reviewed, manually enriched source for campus publication; not created by `run_parsing_pipeline()` |
 | `Campus FY 2025-26 annual statistics NZ-level output/2025/2026/*.xlsx` | Campus-specific documentation created by the separate publication script |
 
