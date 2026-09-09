@@ -66,4 +66,11 @@ testthat::test_that("all-review workbook includes inline and saved rows by type"
   testthat::expect_equal(review$source_type, c("inline", "standalone_saved_object", "inline"))
   testthat::expect_equal(review$report_title[[1L]], "Report A")
   testthat::expect_equal(review$definition_name[[2L]], "Saved Bin")
+
+  worksheet_files <- unzip(output_file, list = TRUE)$Name
+  worksheet_files <- worksheet_files[grepl("^xl/worksheets/sheet[0-9]+[.]xml$", worksheet_files)]
+  worksheet_xml <- vapply(worksheet_files, function(path) {
+    paste(readLines(unz(output_file, path), warn = FALSE), collapse = "")
+  }, character(1L))
+  testthat::expect_false(any(grepl("#N/A", worksheet_xml, fixed = TRUE)))
 })

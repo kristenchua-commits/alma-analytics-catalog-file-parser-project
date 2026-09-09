@@ -55,7 +55,7 @@ if (length(missing_files)) {
 read_parser_csv <- function(path) {
   read.csv(
     path, check.names = FALSE, stringsAsFactors = FALSE,
-    na.strings = "", colClasses = "character"
+    colClasses = "character"
   )
 }
 
@@ -66,15 +66,15 @@ filter_rules <- read_parser_csv(input_files[["filter_rules"]])
 filter_values <- read_parser_csv(input_files[["filter_values"]])
 
 blank_column <- function(data, name) {
-  if (name %in% names(data)) data[[name]] else rep(NA_character_, nrow(data))
+  if (name %in% names(data)) data[[name]] else rep("", nrow(data))
 }
 
 column_item_type <- ifelse(column_rules$rule_kind %in% c("when", "otherwise"), "Bin", "Column")
 column_review <- data.frame(
   rule_type = column_item_type,
   source_workbook = ifelse(column_item_type == "Bin", "Bin Review", "Column Review"),
-  `Electronic/Physical/Fulfillment` = NA_character_,
-  Campus = NA_character_,
+  `Electronic/Physical/Fulfillment` = "",
+  Campus = "",
   rule_name = column_rules$rule_name,
   rule_id = column_rules$rule_id,
   join_operator = column_rules$join_operator,
@@ -101,8 +101,8 @@ column_review <- data.frame(
 filter_review <- data.frame(
   rule_type = "Filter",
   source_workbook = "Filter Review",
-  `Electronic/Physical/Fulfillment` = NA_character_,
-  Campus = NA_character_,
+  `Electronic/Physical/Fulfillment` = "",
+  Campus = "",
   rule_name = filter_rules$rule_name,
   rule_id = filter_rules$rule_id,
   join_operator = filter_rules$join_operator,
@@ -114,7 +114,7 @@ filter_review <- data.frame(
   source_type = filter_rules$source_type,
   record_scope = filter_rules$record_scope,
   rule_index = filter_rules$rule_index,
-  rule_kind = NA_character_,
+  rule_kind = "",
   report_catalog_index = filter_rules$report_catalog_index,
   report_title = filter_rules$report_title,
   report_path = filter_rules$report_path,
@@ -162,6 +162,12 @@ wb <- openxlsx2::wb_workbook(creator = "Alma Analytics catalog file parser")
 wb <- openxlsx2::wb_set_base_font(wb, font_size = 10, font_name = "Aptos")
 
 add_title <- function(wb, sheet, title, subtitle, data, table_name, widths = NULL) {
+  # openxlsx2 serializes R's NA as an Excel #N/A error. Review workbooks should
+  # show absent parser metadata and untouched review fields as ordinary blanks.
+  data[] <- lapply(data, function(column) {
+    column[is.na(column)] <- ""
+    column
+  })
   wb <- openxlsx2::wb_add_worksheet(wb, sheet = sheet, grid_lines = FALSE)
   last_col <- max(1L, ncol(data))
   title_dims <- openxlsx2::wb_dims(rows = 1L, cols = seq_len(last_col))
